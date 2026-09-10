@@ -3,197 +3,185 @@ description: Evaluates the dotnet/csharp-refactoring skill
 type: capability
 defaults:
   timeout: 15m
-  runs: 1
-scoring:
-  threshold: 0.8
-# The fixture uses exact analyzer/test package versions. The runner must provide
-# its normal NuGet restore cache or network access; stimuli do not install tools.
-environment:
-  files:
-    - src: global.json
-      dest: global.json
-    - src: Fixture.sln
-      dest: Fixture.sln
-    - src: src/Billing/AppSettingsHelper.cs
-      dest: src/Billing/AppSettingsHelper.cs
-    - src: src/Billing/AssemblyInfo.cs
-      dest: src/Billing/AssemblyInfo.cs
-    - src: src/Billing/Billing.csproj
-      dest: src/Billing/Billing.csproj
-    - src: src/Billing/Coupons.cs
-      dest: src/Billing/Coupons.cs
-    - src: src/Billing/Coupons.g.cs.template
-      dest: src/Billing/Coupons.g.cs.template
-    - src: src/Billing/CollisionExamples.cs
-      dest: src/Billing/CollisionExamples.cs
-    - src: src/Billing/OrderProcessor.cs
-      dest: src/Billing/OrderProcessor.cs
-    - src: src/Billing/PlatformInfo.cs
-      dest: src/Billing/PlatformInfo.cs
-    - src: src/Billing/Pricing.cs
-      dest: src/Billing/Pricing.cs
-    - src: src/Billing/PublicAPI.Shipped.txt
-      dest: src/Billing/PublicAPI.Shipped.txt
-    - src: src/Billing/PublicAPI.Unshipped.txt
-      dest: src/Billing/PublicAPI.Unshipped.txt
-    - src: tests/Billing.Tests/Billing.Tests.csproj
-      dest: tests/Billing.Tests/Billing.Tests.csproj
-    - src: tests/Billing.Tests/BillingTests.cs
-      dest: tests/Billing.Tests/BillingTests.cs
-  commands:
-    - dotnet restore Fixture.sln --nologo
 stimuli:
-  - name: Rename a method across its declaration and every caller
-    tags:
-      capability: symbol-rename
-      risk: textual-collision
-      journey: modify-code
-    golden_patch:
-      path: golden-patches/rename-method.patch
-    prompt: "In the Billing class library, the method `OrderProcessor.DoStuff` is badly named for what it does — it computes an invoice. Rename it to `ComputeInvoice` everywhere it is declared and called, without changing any behavior. The solution is at Fixture.sln."
+  - name: Rename a shipped public method without breaking existing callers
+    prompt: "In the Billing class library, rename the shipped public method `AppSettingsHelper.ParseIntSetting` to `ParseIntegerSetting` and migrate this solution's callers, while preserving compatibility for existing callers of the old public API. `PublicAPI.Shipped.txt` records the shipped surface. The solution is at Fixture.sln."
+    environment: &fixture-environment
+      files:
+        - src: global.json
+          dest: global.json
+        - src: Fixture.sln
+          dest: Fixture.sln
+        - src: src/Billing/AppSettingsHelper.cs
+          dest: src/Billing/AppSettingsHelper.cs
+        - src: src/Billing/AssemblyInfo.cs
+          dest: src/Billing/AssemblyInfo.cs
+        - src: src/Billing/PublicAPI.Unshipped.txt
+          dest: src/Billing/PublicAPI.Unshipped.txt
+        - src: src/Billing/Billing.csproj
+          dest: src/Billing/Billing.csproj
+        - src: src/Billing/Coupons.cs
+          dest: src/Billing/Coupons.cs
+        - src: src/Billing/Coupons.g.cs.template
+          dest: src/Billing/Coupons.g.cs.template
+        - src: src/Billing/OrderProcessor.cs
+          dest: src/Billing/OrderProcessor.cs
+        - src: src/Billing/PlatformInfo.cs
+          dest: src/Billing/PlatformInfo.cs
+        - src: src/Billing/Pricing.cs
+          dest: src/Billing/Pricing.cs
+        - src: src/Billing/PublicAPI.Shipped.txt
+          dest: src/Billing/PublicAPI.Shipped.txt
+        - src: tests/Billing.Tests/Billing.Tests.csproj
+          dest: tests/Billing.Tests/Billing.Tests.csproj
+        - src: tests/Billing.Tests/BillingTests.cs
+          dest: tests/Billing.Tests/BillingTests.cs
     graders:
       - type: file-contains
         config:
-          path: src/Billing/OrderProcessor.cs
-          value: ComputeInvoice
-      # The rename must propagate to every caller. BillingTests.cs calls the method
-      # directly, so a correct rename lands the new name here too (and the old call
-      # would otherwise fail to compile).
+          path: src/Billing/AppSettingsHelper.cs
+          value: ParseIntegerSetting
       - type: file-contains
         config:
           path: tests/Billing.Tests/BillingTests.cs
-          value: ComputeInvoice
+          value: ParseIntegerSetting
       - type: file-contains
         config:
-          path: src/Billing/CollisionExamples.cs
-          value: 'MigrationNote = "DoStuff is shown in migration notes."'
+          path: src/Billing/AppSettingsHelper.cs
+          value: Obsolete
       - type: file-contains
         config:
-          path: src/Billing/CollisionExamples.cs
-          value: internal int DoStuff()
-      # Behavior-preservation + full-propagation gate: if any declaration or caller
-      # was missed, the test project fails to compile and this grader fails.
+          path: src/Billing/AppSettingsHelper.cs
+          value: ParseIntSetting
       - type: run-command
         config:
-          command: dotnet test Fixture.sln -v:q --no-restore
+          command: dotnet test Fixture.sln --verbosity normal
           expected_exit_code: 0
-          stdout_contains: Passed!
+          stdout_contains: "Total tests: 12"
           timeout: 5m
+      - type: output-matches
+        config:
+          pattern: (public API|compatib|obsolete|shim)
+      - type: output-matches
+        config:
+          pattern: (dotnet (build|test)|rebuild|re-?run[\s\S]{0,30}tests|tests?[\s\S]{0,30}(pass|green))
       - type: prompt
     rubric:
-      - Renamed the declaration and all callers to ComputeInvoice without changing invoice results
-      - Left comments, string values, and unrelated identifiers unchanged
+      - Migrates in-repository callers to ParseIntegerSetting while preserving the shipped ParseIntSetting entry point as an obsolete forwarding compatibility shim
+      - Treats PublicAPI.Shipped.txt as evidence that deleting the old method would break a public contract, rather than blindly removing every old-name occurrence
+      - Rebuilds and re-runs the existing tests after the rename to confirm behavior is preserved
 
-  - name: Move the subtotal calculation into a private helper
-    tags:
-      capability: method-extraction
-      risk: semantic-drift
-      journey: modify-code
-    golden_patch:
-      path: golden-patches/extract-subtotal.patch
-    prompt: "`OrderProcessor.DoStuff` is hard to scan. Move the line-item subtotal loop into a small private method and use it from the invoice path. Keep every result the same. The solution is at Fixture.sln."
+  - name: Rename a member declared by a generated partial source
+    prompt: "Rename the private `Coupons.RateFor` helper to `DiscountRateFor` everywhere it is declared and called, preserving behavior. The solution is at Fixture.sln."
+    environment: *fixture-environment
     graders:
-      # Behavior-preservation gate: the extracted helper must compute identical
-      # results, so the existing tests must still pass.
+      - type: file-contains
+        config:
+          path: src/Billing/Coupons.g.cs.template
+          value: DiscountRateFor
+      - type: file-contains
+        config:
+          path: src/Billing/Coupons.cs
+          value: DiscountRateFor
+      - type: file-not-contains
+        config:
+          path: src/Billing/Coupons.cs
+          value: amount * RateFor(code)
       - type: run-command
         config:
-          command: dotnet test Fixture.sln -v:q --no-restore
+          command: dotnet test Fixture.sln --verbosity normal
           expected_exit_code: 0
-          stdout_contains: Passed!
+          stdout_contains: "Total tests: 10"
           timeout: 5m
-      - type: file-matches
+      - type: output-matches
         config:
-          path: src/Billing/OrderProcessor.cs
-          pattern: 'private( static)? decimal [A-Za-z_][A-Za-z0-9_]*\('
-      - type: run-command
+          pattern: (generated|generator|template)
+      - type: output-matches
         config:
-          command: node -e "const s=require('fs').readFileSync('src/Billing/OrderProcessor.cs','utf8'); const body=s.slice(s.indexOf('public Invoice DoStuff'),s.indexOf('decimal shipping')); const assigned=body.includes('decimal subtotal = ')||body.includes('var subtotal = '); if (body.includes('foreach') || !assigned || !body.includes('(lines);')) process.exit(1)"
-          expected_exit_code: 0
+          pattern: (dotnet (build|test)|rebuild|re-?run[\s\S]{0,30}tests|tests?[\s\S]{0,30}(pass|green))
       - type: prompt
     rubric:
-      - Moved the line-item subtotal calculation into a private helper that the invoice path calls
-      - Preserved quantity multiplication, empty-order behavior, and all invoice results
-      - Kept unrelated behavior and files unchanged
+      - Finds the generated declaration and the hand-authored partial caller as binding-related parts of one rename
+      - Edits Coupons.g.cs.template, the build's source of truth, rather than a generated file under obj
+      - Rebuilds and re-runs the tests so generation occurs again and proves the renamed declaration and caller agree
 
-  - name: Consolidate a duplicated block into a single shared helper
-    tags:
-      capability: duplicate-removal
-      risk: divergent-inputs
-      journey: modify-code
-    golden_patch:
-      path: golden-patches/consolidate-pricing.patch
-    prompt: "The discount-plus-tax formula appears twice inside `OrderProcessor.DoStuff`, once for the order total and once for the quote. Replace the copies with one implementation while keeping both results unchanged. The solution is at Fixture.sln."
+  - name: Consolidate duplicate public helpers without breaking shipped callers
+    prompt: "`ConfigReader` duplicates the parsing implementation in `AppSettingsHelper`. Consolidate the implementation so there is one source of truth, but preserve the shipped `ConfigReader.ReadInt` and `ReadBool` APIs for existing callers. Migrate this solution's callers where appropriate and verify Fixture.sln."
+    environment: *fixture-environment
     graders:
-      # Behavior-preservation gate: the single shared helper must be equivalent to
-      # both original copies, so the existing tests must still pass.
+      - type: file-contains
+        config:
+          path: src/Billing/AppSettingsHelper.cs
+          value: AppSettingsHelper.ParseIntSetting
+      - type: file-contains
+        config:
+          path: src/Billing/AppSettingsHelper.cs
+          value: AppSettingsHelper.ParseBoolSetting
+      - type: file-contains
+        config:
+          path: src/Billing/AppSettingsHelper.cs
+          value: class ConfigReader
+      - type: file-contains
+        config:
+          path: src/Billing/PublicAPI.Shipped.txt
+          value: Billing.ConfigReader
       - type: run-command
         config:
-          command: dotnet test Fixture.sln -v:q --no-restore
+          command: dotnet test Fixture.sln --verbosity normal
           expected_exit_code: 0
-          stdout_contains: Passed!
+          stdout_contains: "Total tests: 10"
           timeout: 5m
-      - type: run-command
+      - type: output-matches
         config:
-          command: node -e "const s=require('fs').readFileSync('src/Billing/OrderProcessor.cs','utf8'); const count=x=>s.split(x).length-1; const gold='tier == '+String.fromCharCode(34)+'gold'+String.fromCharCode(34); if (count('0.08m')>1 || count('1.08m')>1 || count(gold)>1) process.exit(1)"
-          expected_exit_code: 0
-      - type: file-matches
+          pattern: (public API|compatib|shipped|forward)
+      - type: output-matches
         config:
-          path: src/Billing/OrderProcessor.cs
-          pattern: 'private( static)? decimal [A-Za-z_][A-Za-z0-9_]*\('
+          pattern: (dotnet (build|test)|rebuild|re-?run.{0,20}tests|tests? .{0,20}(pass|green))
       - type: prompt
     rubric:
-      - Replaced both copies with one shared implementation
-      - Preserved the distinct order-total and quote inputs and all observable results
+      - Removes the duplicate parsing implementation by making ConfigReader delegate to AppSettingsHelper
+      - Preserves the shipped ConfigReader type and methods rather than deleting a public contract during de-duplication
+      - Re-runs the build and tests after consolidating to prove behavior and existing callers remain intact
 
   - name: Inline a pass-through wrapper and update callers
-    tags:
-      capability: wrapper-removal
-      risk: missed-callers
-      journey: modify-code
-    golden_patch:
-      path: golden-patches/remove-wrapper.patch
-    prompt: "`LegacyTax.ApplyTaxWrapper` only forwards to `TaxRules.Apply`. Remove that extra entry point and have each caller use `TaxRules.Apply` directly. Keep the tax results unchanged. The solution is at Fixture.sln."
+    prompt: "`LegacyTax.ApplyTaxWrapper` does nothing but forward to `TaxRules.Apply`. Inline it: update every caller to call `TaxRules.Apply` directly and remove the wrapper, without changing behavior. The solution is at Fixture.sln."
+    environment: *fixture-environment
     graders:
       # Behavior-preservation + full-propagation gate: every caller (including the
       # test that references the wrapper) must be updated to the underlying call,
       # or the test project fails to compile.
       - type: run-command
         config:
-          command: dotnet test Fixture.sln -v:q --no-restore
+          command: dotnet test Fixture.sln --verbosity normal
           expected_exit_code: 0
-          stdout_contains: Passed!
+          stdout_contains: "Total tests: 10"
           timeout: 5m
       # The pass-through wrapper is actually gone.
       - type: file-not-contains
         config:
           path: src/Billing/Pricing.cs
           value: ApplyTaxWrapper
-      - type: file-contains
+      - type: output-matches
         config:
-          path: tests/Billing.Tests/BillingTests.cs
-          value: Assert.Equal(108m, TaxRules.Apply(100m));
+          pattern: (dotnet (build|test)|rebuild|re-?run.{0,20}tests|tests? .{0,20}(pass|green))
       - type: prompt
     rubric:
-      - Updated all callers to TaxRules.Apply and removed the pass-through member
-      - Preserved the tax result for existing callers
+      - Finds the true binding references to the wrapper before removing it, not just textual matches
+      - Updates every caller to the underlying call and removes the wrapper in one focused operation
+      - Lets the compiler catch any missed reference, then rebuilds and re-runs the tests to confirm green
 
   - name: Merge two near-identical types into one parameterized type
-    tags:
-      capability: type-unification
-      risk: value-drift
-      journey: modify-code
-    golden_patch:
-      path: golden-patches/unify-pricing-types.patch
-    prompt: "`GoldPricing` and `SilverPricing` differ only by name and rate. Replace the duplication with one reusable pricing representation and update its uses. Keep both tier values unchanged. The solution is at Fixture.sln."
+    prompt: "`GoldPricing` and `SilverPricing` are near-identical. Consolidate them into a single parameterized pricing type and update any usages, without changing behavior. The solution is at Fixture.sln."
+    environment: *fixture-environment
     graders:
       # Behavior-preservation + full-propagation gate: usages (including the test
       # that constructs GoldPricing/SilverPricing) must be updated to the merged
       # type, or the test project fails to compile.
       - type: run-command
         config:
-          command: dotnet test Fixture.sln -v:q --no-restore
+          command: dotnet test Fixture.sln --verbosity normal
           expected_exit_code: 0
-          stdout_contains: Passed!
+          stdout_contains: "Total tests: 10"
           timeout: 5m
       # The two near-identical classes are actually gone (merged into one type).
       - type: file-not-contains
@@ -204,168 +192,70 @@ stimuli:
         config:
           path: src/Billing/Pricing.cs
           value: class SilverPricing
-      - type: run-command
+      - type: output-matches
         config:
-          command: node -e "const s=require('fs').readFileSync('src/Billing/Pricing.cs','utf8'); if ((s.match(/internal sealed class /g)||[]).length !== 1) process.exit(1)"
-          expected_exit_code: 0
+          pattern: (dotnet (build|test)|rebuild|re-?run.{0,20}tests|tests? .{0,20}(pass|green))
       - type: prompt
     rubric:
-      - Replaced GoldPricing and SilverPricing with one reusable pricing type
-      - Preserved the gold and silver names and rates at every use site
+      - Merges the two classes into a single type parameterized by name and rate, preserving each tier's values
+      - Updates all usages and re-runs the build and tests to prove behavior is unchanged
 
-  - name: Rename a local without widening the change
-    tags:
-      capability: local-rename
-      risk: scope-creep
-      journey: modify-code
-    golden_patch:
-      path: golden-patches/rename-local.patch
-    prompt: "Inside `OrderProcessor.DoStuff`, rename the local variable `subtotal` to `runningTotal` for readability. Do not change behavior or perform unrelated cleanup. The solution is at Fixture.sln."
+  - name: Decline a framework and package upgrade dressed up as a refactor
+    prompt: Upgrade the Billing project in Fixture.sln to a newer target framework and bump all its NuGet packages to their latest major versions, treating this as a behavior-preserving refactor.
+    environment: *fixture-environment
     graders:
-      - type: file-contains
+      - type: output-matches
         config:
-          path: src/Billing/OrderProcessor.cs
-          value: runningTotal
-      - type: file-not-contains
-        config:
-          path: src/Billing/OrderProcessor.cs
-          value: decimal subtotal
-      - type: file-not-contains
-        config:
-          path: src/Billing/PublicAPI.Shipped.txt
-          value: runningTotal
-      - type: run-command
-        config:
-          command: dotnet test Fixture.sln -v:q --no-restore
-          expected_exit_code: 0
-          stdout_contains: Passed!
-          timeout: 5m
+          pattern: (not a .{0,20}refactor|behavior[- ]?(preserving|chang)|upgrade|major version|out of scope)
       - type: prompt
     rubric:
-      - Renamed only the requested method-local variable and all references to it
-      - Did not add compatibility shims or public API baseline entries for a local name
-      - Preserved all invoice results
-
-  - name: Rename a member used by generated partial code
-    tags:
-      capability: partial-member-rename
-      risk: overwritten-output
-      journey: modify-generated-source
-    golden_patch:
-      path: golden-patches/rename-generated-member.patch
-    prompt: "The public `Coupons.Redeem` name in this package is too generic. Add `Apply` as the preferred name and update this repository without breaking existing callers. The solution is at Fixture.sln."
-    graders:
-      - type: file-contains
-        config:
-          path: src/Billing/Coupons.cs
-          value: Apply(
-      - type: file-contains
-        config:
-          path: src/Billing/Coupons.g.cs.template
-          value: Apply(
-      - type: file-not-contains
-        config:
-          path: src/Billing/Coupons.g.cs.template
-          value: Redeem(
-      - type: file-contains
-        config:
-          path: src/Billing/Coupons.cs
-          value: Redeem(
-      - type: file-contains
-        config:
-          path: src/Billing/Coupons.cs
-          value: Obsolete(
-      - type: file-contains
-        config:
-          path: src/Billing/PublicAPI.Unshipped.txt
-          value: Billing.Coupons.Apply
-      - type: run-command
-        config:
-          command: dotnet clean Fixture.sln -v:q && dotnet test Fixture.sln -v:q --no-restore
-          expected_exit_code: 0
-          stdout_contains: Passed!
-          timeout: 5m
-      - type: prompt
-    rubric:
-      - Added the clearer entry point, retained the existing entry point as an obsolete compatibility shim, and updated the source template
-      - Did not rely on an edit under obj or another generated output directory
-      - Preserved coupon results after regeneration
-
-  - name: Rename an internal member consumed by a friend assembly
-    tags:
-      capability: internal-member-rename
-      risk: cross-assembly-callers
-      journey: modify-code
-    golden_patch:
-      path: golden-patches/rename-friend-member.patch
-    prompt: "Rename `PricingMath.ApplyDiscount` to `CalculateDiscount` and update its callers without changing results. The solution is at Fixture.sln."
-    graders:
-      - type: file-contains
-        config:
-          path: src/Billing/Pricing.cs
-          value: CalculateDiscount(
-      - type: file-contains
-        config:
-          path: tests/Billing.Tests/BillingTests.cs
-          value: PricingMath.CalculateDiscount(
-      - type: file-not-contains
-        config:
-          path: tests/Billing.Tests/BillingTests.cs
-          value: PricingMath.ApplyDiscount(
-      - type: run-command
-        config:
-          command: dotnet test Fixture.sln -v:q --no-restore
-          expected_exit_code: 0
-          stdout_contains: Passed!
-          timeout: 5m
-      - type: prompt
-    rubric:
-      - Updated the internal declaration and its consumer in the friend test assembly
-      - Preserved the existing friend-assembly grant and discount result
+      - Recognizes that a framework or package major-version upgrade is not a behavior-preserving refactor
+      - Declines or redirects to the appropriate upgrade workflow instead of treating it as a refactor
+      - Does not silently perform a behavior-changing version bump under the guise of refactoring
 
   - name: Decline a new-feature request dressed up as a refactor
-    tags:
-      capability: scope-boundary
-      risk: feature-misclassification
-      journey: redirect-request
-    expect_activation: false
-    prompt: 'Before I start, tell me whether adding a new "platinum" loyalty tier at 15% off is a structure-only cleanup or new behavior. Do not edit files.'
+    prompt: 'In Fixture.sln, add a new "platinum" loyalty tier at 15% off and wire it into the pricing tiers so orders can use it, treating this as a behavior-preserving refactor.'
+    environment: *fixture-environment
     graders:
       - type: output-matches
         config:
-          pattern: '(new (feature|behavior)|feature addition|adds? behavior|not (a )?(structure-only|cleanup))'
-      - type: file-not-contains
-        config:
-          path: src/Billing/Pricing.cs
-          value: platinum
+          pattern: (new feature|feature addition|not a .{0,20}refactor|behavior[- ]?(preserving|chang)|adds? new behavior)
       - type: prompt
-        config:
-          prompt: "Reference outcome: classify this as new behavior, leave the fixture unchanged, and redirect to feature implementation with new tests."
     rubric:
-      - Recognizes that adding a pricing tier introduces new behavior
-      - Does not claim existing behavior is merely being reorganized
-      - Did not attempt to add the new pricing tier
+      - Recognizes that adding a new pricing tier is a new feature, not a behavior-preserving refactor
+      - Distinguishes the feature request from a refactor rather than conflating them, and does not claim behavior is preserved when it is deliberately being extended
+      - If it proceeds, does so as an explicit feature addition with its own new tests, not under the guise of a no-behavior-change refactor
 
   - name: Keep behavior-changing bug fixes out of a behavior-preserving refactor
-    tags:
-      capability: scope-boundary
-      risk: bugfix-misclassification
-      journey: redirect-request
-    expect_activation: false
-    prompt: "Before I edit `OrderProcessor.DoStuff`, tell me whether changing the free-shipping threshold from 100 to 75 preserves behavior or is a behavior change. Do not edit files."
+    prompt: "In Fixture.sln, rename `OrderProcessor.DoStuff` to `ComputeInvoice` and, while you are there, change the free-shipping threshold from $100 to $50. Treat the whole change as one behavior-preserving refactor."
+    environment: *fixture-environment
     graders:
-      - type: output-matches
-        config:
-          pattern: '(behavior change|changes? (results|behavior)|bug fix|not behavior[- ]?preserving)'
       - type: file-contains
         config:
           path: src/Billing/OrderProcessor.cs
-          value: 'decimal shipping = subtotal >= 100m ? 0m : 9.99m;'
-      - type: prompt
+          value: ComputeInvoice
+      - type: file-contains
         config:
-          prompt: "Reference outcome: classify the threshold edit as a behavior change, leave the fixture unchanged, and redirect to a tested bug-fix workflow."
+          path: tests/Billing.Tests/BillingTests.cs
+          value: ComputeInvoice
+      - type: file-contains
+        config:
+          path: src/Billing/OrderProcessor.cs
+          value: subtotal >= 100m
+      - type: output-matches
+        config:
+          pattern: (separate|follow[- ]?up|behavior[- ]?(preserving|chang)|not (a )?refactor)
+      - type: output-matches
+        config:
+          pattern: (shipping|threshold|\$50)
+      - type: run-command
+        config:
+          command: dotnet test Fixture.sln --verbosity normal
+          expected_exit_code: 0
+          stdout_contains: "Total tests: 10"
+          timeout: 5m
+      - type: prompt
     rubric:
-      - Recognizes that changing the shipping threshold deliberately changes results
-      - Does not claim that the requested change preserves existing behavior
-      - Did not attempt the threshold edit through this workflow
-      - Redirected the behavior change to a tested feature or bug-fix workflow
+      - Completes the requested rename as a focused behavior-preserving refactor and migrates its callers
+      - Refuses or defers the $50 shipping-threshold change because it deliberately changes invoice behavior and belongs in a separate tested change
+      - Keeps the existing $100 threshold and does not claim the combined request is behavior-preserving
