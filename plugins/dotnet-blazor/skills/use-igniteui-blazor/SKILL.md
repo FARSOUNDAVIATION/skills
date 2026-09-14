@@ -26,7 +26,9 @@ dotnet add package IgniteUI.Blazor.Lite       # OSS core UI components (MIT)
 dotnet add package IgniteUI.Blazor.GridLite   # OSS lightweight grid (MIT)
 ```
 
-These two packages split by component: `IgniteUI.Blazor.Lite` ships the core controls — `IgbInput`, `IgbCombo`, `IgbDialog` and the rest of the general-purpose set — while `IgniteUI.Blazor.GridLite` ships only the grid. Any `Igb*` component other than the grid therefore comes from `IgniteUI.Blazor.Lite`. Reference both packages only when the app needs both, and never a per-component package: `IgniteUI.Blazor.<ComponentName>` does not exist.
+Use `IgniteUI.Blazor.Lite` for core controls such as `IgbInput`, `IgbCombo` and `IgbDialog`, and `IgniteUI.Blazor.GridLite` for the lightweight grid. Reference both packages only when the app needs both. Do not invent per-component packages such as `IgniteUI.Blazor.Combo`.
+
+Charts, maps, gauges and other premium components are not included in Lite. Check the requested component's package before recommending a reference.
 
 ## 2. `IgniteUI.Blazor.Lite` Service Registration
 
@@ -45,9 +47,9 @@ builder.Services.AddIgniteUIBlazor(
 
 Module names always follow `Igb{ComponentName}Module`. Passing modules eagerly loads them during startup, increasing the initial transfer to reduce first-render latency. Components not listed still register their own modules on first render.
 
-For a GridLite-only setup, do not call `AddIgniteUIBlazor()`. Reference `IgniteUI.Blazor.GridLite`, add the control namespace, and link the GridLite stylesheet shown below.
+For a GridLite-only setup, do not call `AddIgniteUIBlazor()` or add `app.bundle.js`. Reference `IgniteUI.Blazor.GridLite`, add the control namespace, and link the GridLite stylesheet shown below.
 
-**Blazor Web App:** call `AddIgniteUIBlazor()` in **both** the server and the client `Program.cs`.
+**Split Blazor Web App:** call `AddIgniteUIBlazor()` in **both** the server and the client `Program.cs`.
 
 ```csharp
 // Server
@@ -60,6 +62,8 @@ builder.Services.AddIgniteUIBlazor();
 builder.Services.AddIgniteUIBlazor();
 ```
 
+For a single-project Interactive Server Blazor Web App, call `AddIgniteUIBlazor()` once in the server `Program.cs`. Do not add a client project or WebAssembly services.
+
 ## 3. `_Imports.razor`
 
 ```razor
@@ -71,6 +75,8 @@ Add it to both `_Imports.razor` files in split Blazor Web App solutions.
 ## 4. Host page — theme stylesheet
 
 Host page is `wwwroot/index.html` (WASM/MAUI), `Pages/_Host.cshtml` (Server), or `Components/App.razor` (Web App).
+
+`IgniteUI.Blazor.Lite` 0.1.1 includes a Blazor `.lib.module.js` initializer that loads its JavaScript bootstrap automatically. Do not add a manual `app.bundle.js` tag for this version. Keep the existing Blazor framework script. For other package versions, verify their initialization behavior before changing script tags.
 
 ```html
 <link href="_content/IgniteUI.Blazor/themes/light/bootstrap.css" rel="stylesheet" />

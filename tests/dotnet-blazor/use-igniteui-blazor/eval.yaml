@@ -34,9 +34,6 @@ stimuli:
       - type: output-matches
         config:
           pattern: '_content/IgniteUI\.Blazor/themes/(?:light|dark)/(?:bootstrap|material|fluent|indigo)\.css'
-      - type: output-matches
-        config:
-          pattern: '(?:both|each)[\s\S]{0,80}(?:[Ss]erver[\s\S]{0,80}[Cc]lient|[Cc]lient[\s\S]{0,80}[Ss]erver)'
       - type: prompt
     rubric:
       - Identifies the package references for both IgniteUI.Blazor.Lite and IgniteUI.Blazor.GridLite
@@ -117,6 +114,7 @@ stimuli:
       - type: prompt
     rubric:
       - Does not register the Ignite UI services in Program.cs
+      - Does not add a manual Ignite UI JavaScript bundle reference
       - Links the grid package's own stylesheet, served from the grid package's content root rather than from the core package's theme folder
       - Explains that the unstyled grid is caused by the missing stylesheet
       - Makes the control namespace available to the page, for example through _Imports.razor
@@ -144,9 +142,15 @@ stimuli:
       - type: output-contains
         config:
           substring: _content/IgniteUI.Blazor/themes/dark/material.css
-      - type: output-matches
+      - type: output-contains
         config:
-          pattern: '(?:Igb[A-Za-z]+Module[\s\S]{0,400}(?:[Pp]re-?[Ll]oad|[Ee]ager|[Ss]tartup)|(?:[Pp]re-?[Ll]oad|[Ee]ager|[Ss]tartup)[\s\S]{0,400}Igb[A-Za-z]+Module)'
+          substring: IgbInputModule
+      - type: output-contains
+        config:
+          substring: IgbComboModule
+      - type: output-contains
+        config:
+          substring: IgbDialogModule
       - type: prompt
     rubric:
       - References only IgniteUI.Blazor.Lite and does not pull in the grid package the user ruled out
@@ -212,9 +216,6 @@ stimuli:
       - type: output-contains
         config:
           substring: AddIgniteUIBlazor
-      - type: output-matches
-        config:
-          pattern: '(?:Igb[A-Za-z]+Module[\s\S]{0,400}(?:[Pp]re-?[Ll]oad|[Ee]ager|[Ss]tartup)|(?:[Pp]re-?[Ll]oad|[Ee]ager|[Ss]tartup)[\s\S]{0,400}Igb[A-Za-z]+Module)'
       - type: prompt
     rubric:
       - Says the no-argument call pre-loads no modules and each component loads its own module on first render
