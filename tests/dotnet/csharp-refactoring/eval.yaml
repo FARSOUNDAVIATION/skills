@@ -68,9 +68,12 @@ stimuli:
             compatibility_test = re.search(
             r'LegacyParseIntSetting_RemainsCompatible\s*\(\)\s*\{(?P<body>.*?)\n\s*\}',
             tests, re.S);
+            ordinary_tests = tests[:compatibility_test.start()] + tests[compatibility_test.end():]
+            if compatibility_test else tests;
             sys.exit(0 if shim and 'ParseIntegerSetting' in shim.group('body')
             and compatibility_test
-            and 'ParseIntSetting(' in compatibility_test.group('body') else 1)"
+            and 'ParseIntSetting(' in compatibility_test.group('body')
+            and 'ParseIntSetting(' not in ordinary_tests else 1)"
           expected_exit_code: 0
           timeout: 1m
       - type: run-command
