@@ -204,7 +204,7 @@ stimuli:
     rubric:
       - Gives a theme stylesheet link from the core package's _content/IgniteUI.Blazor/themes/ folder
       - Links exactly one theme rather than several
-      - Adds no Ignite UI script tag to the host page, in particular no app.bundle.js reference
+      - Adds no Ignite UI script tag to the host page
       - Does not link the GridLite stylesheet, which belongs only to a grid-only setup
       - Stays on the host-page tags the user asked for instead of restating the package and startup steps
   - name: Decide whether to pass module types to AddIgniteUIBlazor

@@ -47,7 +47,7 @@ builder.Services.AddIgniteUIBlazor(
 
 Module names always follow `Igb{ComponentName}Module`. Passing modules eagerly loads them during startup, increasing the initial transfer to reduce first-render latency. Components not listed still register their own modules on first render.
 
-For a GridLite-only setup, do not call `AddIgniteUIBlazor()` or add `app.bundle.js`. Reference `IgniteUI.Blazor.GridLite`, add the control namespace, and link the GridLite stylesheet shown below.
+For a GridLite-only setup, do not call `AddIgniteUIBlazor()` or add manual Ignite UI script tags. Reference `IgniteUI.Blazor.GridLite`, add the control namespace, and link the GridLite stylesheet shown below.
 
 **Split Blazor Web App:** call `AddIgniteUIBlazor()` in **both** the server and the client `Program.cs`.
 
@@ -76,7 +76,7 @@ Add it to both `_Imports.razor` files in split Blazor Web App solutions.
 
 Host page is `wwwroot/index.html` (WASM/MAUI), `Pages/_Host.cshtml` (Server), or `Components/App.razor` (Web App).
 
-`IgniteUI.Blazor.Lite` 0.1.1 includes a Blazor `.lib.module.js` initializer that loads its JavaScript bootstrap automatically. Do not add a manual `app.bundle.js` tag for this version. Keep the existing Blazor framework script. For other package versions, verify their initialization behavior before changing script tags.
+`IgniteUI.Blazor.Lite` 0.1.1 loads its JavaScript automatically through a Blazor initializer. Keep the existing Blazor framework script and add the theme stylesheet below. Do not add a manual Ignite UI script tag.
 
 ```html
 <link href="_content/IgniteUI.Blazor/themes/light/bootstrap.css" rel="stylesheet" />
