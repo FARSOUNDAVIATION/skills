@@ -21,6 +21,8 @@ description: >
 
 ## 1. NuGet package
 
+Before adding packages, inspect the target projects' existing package references. If `IgniteUI.Blazor` or `IgniteUI.Blazor.Trial` is already referenced, keep that package strategy and do not add Lite or GridLite. Only switch package families when the user explicitly asks, replacing conflicting references rather than keeping both.
+
 ```bash
 dotnet add package IgniteUI.Blazor.Lite       # OSS core UI components (MIT)
 dotnet add package IgniteUI.Blazor.GridLite   # OSS lightweight grid (MIT)
@@ -49,7 +51,16 @@ Module names always follow `Igb{ComponentName}Module`. Passing modules eagerly l
 
 For a GridLite-only setup, do not call `AddIgniteUIBlazor()` or add manual Ignite UI script tags. Reference `IgniteUI.Blazor.GridLite`, add the control namespace, and link the GridLite stylesheet shown below.
 
-**Split Blazor Web App:** call `AddIgniteUIBlazor()` in **both** the server and the client `Program.cs`.
+**Split Blazor Web App:** add each required package to both the Server and Client `.csproj` files. For core controls, use the actual project paths in place of these examples.
+
+```bash
+dotnet add Server/Server.csproj package IgniteUI.Blazor.Lite
+dotnet add Client/Client.csproj package IgniteUI.Blazor.Lite
+```
+
+If GridLite is needed, add `IgniteUI.Blazor.GridLite` to both projects as well. For a GridLite-only app, add only that package and skip the service registrations below.
+
+For Lite, call `AddIgniteUIBlazor()` in **both** the server and client `Program.cs`.
 
 ```csharp
 // Server

@@ -37,6 +37,7 @@ stimuli:
       - type: prompt
     rubric:
       - Identifies the package references for both IgniteUI.Blazor.Lite and IgniteUI.Blazor.GridLite
+      - Ensures the required Ignite UI packages are available to both the Server and Client projects, with file-specific package-reference guidance
       - Says AddIgniteUIBlazor() must be called in both the Server and Client Program.cs files for a split Blazor Web App
       - Adds @using IgniteUI.Blazor.Controls to _Imports.razor so the components are available everywhere that needs them
       - Links an Ignite UI theme stylesheet in the host page
@@ -242,6 +243,18 @@ stimuli:
       - Does not point the user at IgniteUI.Blazor.GridLite, which ships only the grid
       - "Covers what IgbCombo needs beyond the package: AddIgniteUIBlazor() registration, the IgniteUI.Blazor.Controls namespace, and a theme stylesheet in the host page"
       - Does not invent a per-component package name such as IgniteUI.Blazor.Combo
+  - name: Preserve an existing full Ignite UI package setup
+    prompt: |
+      My Blazor Web App already references IgniteUI.Blazor.Trial in its Server and Client projects, and its grid works correctly.
+
+      I now want to add an IgbCombo to one page. What package references or startup changes do I need?
+    graders:
+      - type: prompt
+    rubric:
+      - Keeps the existing IgniteUI.Blazor.Trial references instead of recommending a switch to another package family
+      - Does not add IgniteUI.Blazor.Lite or IgniteUI.Blazor.GridLite alongside the existing package
+      - Recognizes that IgbCombo is available through the existing package and does not require a separate package
+      - Reuses the existing Ignite UI service registration instead of adding a separate Lite setup
   - name: Stay dormant for a plain Blazor component request
     prompt: |
       Build a reusable Blazor confirmation dialog component with confirm and cancel callbacks. Use only built-in Blazor APIs and include a small usage example.
