@@ -107,8 +107,7 @@ dotnet test    # stays green; same pass count as before
 git restore .  # if the gate fails, revert THIS step and reassess
 ```
 
-One operation per step; never mix a refactor and a behavior change in the same step. On red, revert — a
-refactor that changes behavior is a bug, not a refactor.
+One operation per step; never mix a refactor and a behavior change in the same step. On red, stop and report the failure; repair only your edit without discarding unrelated worktree changes.
 
 ## Final response contract
 
