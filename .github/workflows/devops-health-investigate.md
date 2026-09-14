@@ -3,7 +3,9 @@ name: "DevOps Health — Deep Investigation"
 description: >
   Worker agent that performs deep root-cause analysis on a single
   health check finding (pipeline, infrastructure, or resource).
-  Dispatched by the health check orchestrator.
+  Dispatched by the health check orchestrator. For repository-controlled
+  infrastructure faults, it validates and multi-model reviews a minimal fix,
+  then opens a draft pull request.
 
 on:
   permissions: {}
@@ -30,9 +32,15 @@ on:
       correlation_id:
         description: "Unique ID linking this investigation to the health check run"
         required: true
+      dry_run:
+        description: "Investigate and validate without posting comments or creating a PR"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: gh-aw-${{ github.workflow }}-${{ inputs.finding_id }}
+  job-discriminator: ${{ github.run_id }}
 
 model: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'gpt-5.6-sol' }}
 
@@ -45,11 +53,24 @@ permissions:
 tools:
   github:
     toolsets: [repos, issues, pull_requests, actions]
-  bash: ["cat", "grep", "head", "tail", "find", "ls", "wc", "jq", "date", "sort", "diff"]
+  bash: ["cat", "grep", "head", "tail", "find", "ls", "wc", "jq", "date", "sort", "diff", "git", "python", "python3", "node", "npm", "npx", "dotnet", "pwsh"]
+  edit:
 
 safe-outputs:
+  staged: ${{ inputs.dry_run }}
   add-comment:
     max: 1
+  create-pull-request:
+    max: 1
+    draft: true
+    protected-files: fallback-to-issue
+    fallback-as-issue: true
+    max-patch-files: 20
+    max-patch-size: 1024
+    allowed-files:
+      - "eng/**"
+      - "plugins/*/plugin.json"
+      - "Directory.Build.*"
   noop:
     report-as-issue: false
 
@@ -97,6 +118,7 @@ Investigate the finding identified by the inputs provided to this workflow run. 
 - `resource_url`: `${{ inputs.resource_url }}` — URL to the primary resource
 - `health_issue_number`: `${{ inputs.health_issue_number }}` — Issue to update
 - `correlation_id`: `${{ inputs.correlation_id }}` — Links this investigation to the health check run
+- `dry_run`: `${{ inputs.dry_run }}` — When true, do not post a comment or create a PR
 
 ---
 
@@ -116,6 +138,10 @@ Follow the playbook steps meticulously. For each piece of evidence:
 - Record the **source** (API endpoint, file path, log excerpt)
 - Note the **timestamp** of the evidence
 - Assess **relevance** to the finding
+- Read the relevant repository files and their recent Git history.
+- Find the last successful run of the same workflow and compare its commit with
+  the failed run.
+- Search open and closed issues and pull requests for the same failure signature.
 
 ### Step 3: Determine Root Cause
 
@@ -128,14 +154,117 @@ Based on the gathered evidence:
 3. Identify the **blast radius** — what else is affected?
 4. Check for **related issues** — is this already tracked?
 
-### Step 4: Generate Remediation Steps
+### Step 4: Decide Whether an Automatic Fix Is Safe
 
-Provide 1–3 specific, actionable remediation steps. Each step should:
-- Be concrete (include file paths, commands, or config changes)
-- Be ordered by recommended priority
-- Include any caveats or risks
+Classify the finding before editing files.
 
-### Step 5: Report Back
+An automatic fix is eligible only when all conditions are true:
+
+1. The root cause is in repository-controlled files.
+2. Confidence is High, with direct log, diff, or configuration evidence.
+3. The change is minimal, reversible, and within the `create-pull-request`
+   `allowed-files` scope.
+4. The change does not modify secrets, credentials, repository settings,
+   permissions, deployment behavior, billing, or external service state.
+5. The change does not remove dependencies, upgrade a major dependency version,
+   or weaken validation, security, required checks, or error reporting.
+6. A targeted validation can reproduce the failure or prove the configuration
+   defect, and the same validation passes after the change.
+7. No existing open pull request already contains an equivalent fix.
+
+If any condition is false or uncertain, do not edit files. Report the evidence,
+the suggested fix, and the owner who must take the next action.
+
+Files under `.github/` and protected root manifests are outside the automatic
+edit scope. This repository does not provide the GitHub App credential required
+for automated workflow-file pushes. For a validated fix that touches one of
+these files, do not edit files. Report the complete proposed patch, validation
+evidence, MMR results, and permission limit. Do not claim that a pull request
+was created.
+
+### Step 5: Generate and Implement the Fix
+
+First, provide 1–3 specific remediation steps. Each step must:
+- Be concrete and include file paths, commands, or config changes.
+- Be ordered by recommended priority.
+- Include caveats and risks.
+
+When the automatic-fix gate passes:
+
+1. Make the smallest repository change that fixes the root cause.
+2. Add or update a regression test when the repository has a suitable test
+   surface.
+3. Run the smallest targeted validation that reproduces the original failure.
+4. Run directly related format, compile, lint, and test checks.
+5. If an agentic workflow source changes, run
+   `gh aw compile <workflow-id> --strict`, include its generated lock file, and
+   inspect the lock-file diff. Do not edit generated lock files by hand.
+6. If any required validation is unavailable, fails, or does not cover the
+   original failure, stop. Revert the attempted edits and report a suggested
+   fix only.
+
+### Step 6: Mandatory Multi-Model Review
+
+Before creating a pull request, prepare one review brief with:
+
+- finding, root cause, and evidence;
+- relevant history and last-success comparison;
+- complete diff;
+- tests and exact results;
+- risks, assumptions, and blast radius.
+
+Send the same brief to all three review agents:
+
+1. `infra-review-claude`
+2. `infra-review-gpt`
+3. `infra-review-gemini`
+
+Invoke each named inline agent and keep its separate response as review
+evidence. Do not write a review on an agent's behalf.
+
+Each reviewer must check correctness, security, performance, maintainability,
+customer regression risk, whether the change matches the finding, whether
+history shows hidden behavior, secret exposure, and whether shipped artifacts
+change unexpectedly.
+
+Consolidate all findings. Do not average away disagreements. Quote material
+dissent exactly. Fix every confirmed blocking or high-confidence finding, rerun
+the affected checks, and repeat the three reviews on the final diff if the fix
+changed materially.
+
+Create a PR only when:
+
+- all three model families returned a review;
+- there are no unresolved blocking findings;
+- the original failure is covered by passing validation;
+- the final diff stays within the automatic-fix gate;
+- the safe-output handler can create the branch for every changed file.
+
+### Step 7: Create a Draft Pull Request
+
+If `dry_run` is true, skip this step. Do not emit a safe output here; Step 8
+emits the one dry-run result.
+
+Otherwise, call `create_pull_request` with:
+
+- a concise branch name under `automation/infra-fix-`;
+- a title that states the fix, not the investigation process;
+- `draft: true`;
+- a body that follows the repository pull request description style:
+  - `Fixes #<issue>` when a tracking issue exists, otherwise `Relates to
+    #<health_issue_number>`;
+  - `## Summary` with what changed and why;
+  - `## Root cause` with direct evidence and history;
+  - `## Validation` with exact commands and results;
+  - `## Multi-model review` with the three models, consolidated findings, fixes,
+    and any material dissent;
+  - `## Risk` with remaining limits and rollback guidance.
+
+Never enable auto-merge. Never mark the PR ready for review.
+If protected-file policy produces a fallback issue instead, report it as a
+validated fix proposal, not as a draft PR.
+
+### Step 8: Report Back
 
 Post your investigation results as a comment on the pinned health issue.
 
@@ -165,6 +294,12 @@ add-comment:
     2. {step 2}
     3. {step 3} (if applicable)
 
+    ### Automatic Fix
+    {Draft PR link and validation summary, or why the automatic-fix gate did not pass}
+
+    ### Multi-Model Review
+    {Claude, GPT, and Gemini verdicts; consolidated findings; material dissent}
+
     ### Evidence
     {key log excerpts, API responses, or code references}
 
@@ -174,6 +309,12 @@ add-comment:
     ---
     <sub>🔍 [Investigation Run #{this_run_number}]({this_run_url}) · Dispatched by health check · {correlation_id}</sub>
 ```
+
+If `dry_run` is true, do not call `add-comment` or `create_pull_request`. Call
+`noop` exactly once with a compact summary of the root cause, automatic-fix
+decision, proposed patch, validation plan, and MMR result. Safe outputs are
+also staged for dry runs, so an accidental mutating output can only produce a
+preview and cannot change GitHub state.
 
 ---
 
@@ -185,4 +326,38 @@ add-comment:
 - **Include source evidence**: Quote specific error messages, log lines, or commit SHAs. Use code blocks for log excerpts.
 - **Check recent commits**: For pipeline and quality findings, always check commits between the last successful state and the current failure.
 - **Cross-reference**: Look for related open issues or PRs that might already be tracking this problem.
+- **No speculative PRs**: A plausible fix is not enough. Require direct root-cause evidence, passing validation for the original failure, and three-family MMR.
+- **One fix per PR**: Do not combine unrelated findings. If one root cause explains several failures, list every covered failure in the PR body.
+- **Existing fix wins**: If an open PR already fixes the root cause, do not create a duplicate. Link that PR in the report.
 - **Time-box yourself**: If evidence is insufficient after reasonable investigation, report what you found with appropriate confidence level rather than spiraling.
+
+## agent: `infra-review-claude`
+---
+description: Reviews an infrastructure fix for correctness, safety, regression risk, and historical consistency
+model: claude-sonnet-5
+---
+Review only the supplied evidence, diff, history, and test results. Identify
+blocking defects and high-confidence risks. Verify that the patch fixes the
+reported root cause without weakening controls or changing unrelated behavior.
+Quote evidence for every finding. Return `APPROVE` only when no blocking issue
+remains.
+
+## agent: `infra-review-gpt`
+---
+description: Reviews an infrastructure fix for correctness, security, validation quality, and scope
+model: gpt-5.6-terra
+---
+Review only the supplied evidence, diff, history, and test results. Check the
+failure-to-fix chain, test adequacy, security boundaries, error handling, and
+scope. Identify hidden behavior changes and artifact changes. Quote evidence for
+every finding. Return `APPROVE` only when no blocking issue remains.
+
+## agent: `infra-review-gemini`
+---
+description: Reviews an infrastructure fix for alternative explanations, edge cases, and operational reliability
+model: gemini-3.7-flash
+---
+Review only the supplied evidence, diff, history, and test results. Challenge the
+root-cause hypothesis, search for missed edge cases in the provided material,
+and assess operational reliability and rollback. Quote evidence for every
+finding. Return `APPROVE` only when no blocking issue remains.

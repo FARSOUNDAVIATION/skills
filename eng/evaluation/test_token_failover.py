@@ -126,6 +126,50 @@ class TokenFailoverTests(unittest.TestCase):
                 )
                 self.assertEqual(frontmatter["environment"], "copilot-pat-pool")
 
+    def test_devops_health_automation_can_safely_propose_fixes(self) -> None:
+        workflows = REPO_ROOT / ".github" / "workflows"
+        health_check = (workflows / "devops-health-check.md").read_text(
+            encoding="utf-8"
+        )
+        groom_source = workflows / "devops-health-groom.md"
+        groom = groom_source.read_text(encoding="utf-8")
+        groom_frontmatter = yaml.safe_load(groom.split("---", 2)[1])
+        investigate_source = workflows / "devops-health-investigate.md"
+        investigate = investigate_source.read_text(encoding="utf-8")
+        investigate_frontmatter = yaml.safe_load(investigate.split("---", 2)[1])
+
+        self.assertIn("Optional cache keys are not missing data", health_check)
+        self.assertIn("do not call `missing-data`", health_check)
+        self.assertIn("If `update-issue`, `add-comment`, or `dispatch-workflow`", health_check)
+        self.assertTrue(groom_frontmatter["tools"]["cli-proxy"])
+        self.assertIn("Do not finish with only a text response", groom)
+
+        trigger = investigate_frontmatter.get("on", investigate_frontmatter.get(True))
+        dispatch_inputs = trigger["workflow_dispatch"]["inputs"]
+        self.assertEqual(dispatch_inputs["dry_run"]["type"], "boolean")
+        self.assertFalse(dispatch_inputs["dry_run"]["default"])
+
+        create_pr = investigate_frontmatter["safe-outputs"]["create-pull-request"]
+        self.assertEqual(
+            investigate_frontmatter["safe-outputs"]["staged"],
+            "${{ inputs.dry_run }}",
+        )
+        self.assertTrue(create_pr["draft"])
+        self.assertNotIn("allow-workflows", create_pr)
+        self.assertEqual(create_pr["protected-files"], "fallback-to-issue")
+        self.assertNotIn(".github/workflows/**", create_pr["allowed-files"])
+        self.assertFalse(
+            any(path.startswith(".github/") for path in create_pr["allowed-files"])
+        )
+        self.assertLessEqual(create_pr["max-patch-files"], 20)
+        self.assertNotIn("gh", investigate_frontmatter["tools"]["bash"])
+
+        for model in ("claude-sonnet-5", "gpt-5.6-terra", "gemini-3.7-flash"):
+            self.assertIn(f"model: {model}", investigate)
+        self.assertIn("all three model families returned a review", investigate)
+        self.assertIn("If `dry_run` is true, skip this step", investigate)
+        self.assertIn("`noop` exactly once", investigate)
+
     def run_selector(
         self,
         tokens: dict[int, str],

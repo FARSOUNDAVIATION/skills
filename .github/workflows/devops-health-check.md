@@ -276,6 +276,11 @@ After collecting all findings, perform the diff:
    - Primary sort: severity (🔴 → 🟡 → 🔵)
    - Secondary sort: category (pipeline → infra → resource)
 
+The `known-noise` key is optional configuration. If it is absent, use an empty
+list and continue normally. Do NOT call `missing-data` or report a cache miss for
+an absent `known-noise` key. Only report missing cache data when a required key
+was restored successfully but cannot be read or parsed.
+
 ---
 
 ## Step 3: Analysis
@@ -488,7 +493,10 @@ Before finishing, verify:
 - [ ] At least one `dispatch-workflow` call was made (if any 🔴 critical or qualifying 🟡 warning findings exist)
 - [ ] All 🔴 critical NEW findings have been dispatched (up to budget cap)
 - [ ] The "🔍 Investigation Results" section in the issue body includes newly dispatched findings as "🔄 Dispatched" and preserves existing rows from the previous body
-- [ ] The noop summary message mentions how many investigations were dispatched
+- [ ] If no other safe output was emitted, the `noop` summary mentions that zero
+      investigations were dispatched
+- [ ] If `update-issue`, `add-comment`, or `dispatch-workflow` was emitted, do
+      not call `noop`
 
 ---
 
@@ -496,6 +504,7 @@ Before finishing, verify:
 
 - **Time budget**: You have a 60-minute timeout. Prioritize reaching Steps 4 and 5 (issue update + dispatch). Do NOT write intermediate scripts or analysis files. Work through each check, collect findings in memory, and proceed directly to output. Aim to complete data collection (Step 1) within 30 minutes.
 - **`cache-memory` persists automatically — do NOT manage it with `git`**: The `cache-memory` tool loads and saves state on its own. Never run `git` commands (e.g. `git config`, `git -C /tmp/gh-aw/cache-memory log/add/commit`) against the cache directory to inspect or persist state — use the `cache-memory` load/save operations described in Step 2. Manual git plumbing is unnecessary and only burns the effective-token budget.
+- **Optional cache keys are not missing data**: `known-noise` is optional. Its absence means "no noise patterns configured." Continue with an empty list and do not call `missing-data`. Reserve `missing-data` for required inputs that are unavailable and prevent a required result.
 - **Token budget — don't retry denied commands**: The bash tool only permits the commands in the `bash:` allowlist. If a command is denied, do NOT re-issue the same or a slightly reworded command in a loop — repeated denials re-process the full context and exhaust the effective-token budget, failing the run. Use an allowed alternative (`jq`/`grep`/`sed`) or skip that sub-step and note it, then move on.
 - **Efficiency**: Process API responses in memory. Do NOT create Python/bash scripts to analyze data — parse JSON directly using `jq` or inline analysis. Do NOT write intermediate files unless explicitly required by the output format. The bash allowlist does NOT include `python`, `python3`, `node`, or other general-purpose language runtimes — any attempt to invoke them WILL be blocked by security policy. Use `jq` for all JSON processing.
 - **CRITICAL — Safe output body must be inline**: When calling `update-issue`, the `body` field must contain the **complete, literal issue body text**. NEVER write the body to a file and use a shell reference like `$(cat file.txt)` — safe outputs are literal JSON strings, not shell-evaluated. Pass the body directly as the string value.
