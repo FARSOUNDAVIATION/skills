@@ -134,6 +134,6 @@ checks.
 ## Stop and ask when
 
 - The baseline is already red (you can't prove you preserved behavior).
-- A public/shipped API would change and there is no forwarder/shim path and no analyzer/ApiCompat gate.
+- A public/shipped API would change without a forwarder/shim or explicit authorization for a breaking change.
 - Equivalence depends on runtime behavior tests don't cover (reflection, DI, serialization, `dynamic`,
   P/Invoke) — flag it.
