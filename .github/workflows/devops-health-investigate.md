@@ -332,6 +332,8 @@ preview and cannot change GitHub state.
 - **Existing fix wins**: If an open PR already fixes the root cause, do not create a duplicate. Link that PR in the report.
 - **Time-box yourself**: If evidence is insufficient after reasonable investigation, report what you found with appropriate confidence level rather than spiraling.
 
+<!-- markdownlint-disable MD003 -->
+
 ## agent: `infra-review-claude`
 ---
 description: Reviews an infrastructure fix for correctness, safety, regression risk, and historical consistency
