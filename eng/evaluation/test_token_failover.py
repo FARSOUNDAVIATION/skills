@@ -169,10 +169,17 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertNotIn("gh", investigate_frontmatter["tools"]["bash"])
 
         for model in ("claude-sonnet-5", "gpt-5.6-terra", "gemini-3.7-flash"):
-            self.assertIn(f"model: {model}", investigate)
+            self.assertIn(f"`{model}`", investigate)
+        self.assertIn("Run a multi-model review", investigate)
+        self.assertIn('`task` subagents', investigate)
+        self.assertNotIn("## agent:", investigate)
+        self.assertNotIn("markdownlint-disable MD003", investigate)
         self.assertIn("all three model families returned a review", investigate)
         self.assertIn("If `dry_run` is true, skip this step", investigate)
         self.assertIn("`noop` exactly once", investigate)
+        self.assertIn("reads `.github/pull_request_template.md`", investigate)
+        self.assertIn("**Health-check correctness**", investigate)
+        self.assertIn("Do not include model names", investigate)
 
     def run_selector(
         self,

@@ -214,14 +214,16 @@ Before creating a pull request, prepare one review brief with:
 - tests and exact results;
 - risks, assumptions, and blast radius.
 
-Send the same brief to all three review agents:
+Run a multi-model review by sending the same brief to three independent
+`task` subagents. Use `agent_type: "general-purpose"` and one model from each
+required family:
 
-1. `infra-review-claude`
-2. `infra-review-gpt`
-3. `infra-review-gemini`
+1. `claude-sonnet-5`
+2. `gpt-5.6-terra`
+3. `gemini-3.7-flash`
 
-Invoke each named inline agent and keep its separate response as review
-evidence. Do not write a review on an agent's behalf.
+Keep each response as separate review evidence. Do not write a review on a
+subagent's behalf.
 
 Each reviewer must check correctness, security, performance, maintainability,
 customer regression risk, whether the change matches the finding, whether
@@ -251,15 +253,21 @@ Otherwise, call `create_pull_request` with:
 - a concise branch name under `automation/infra-fix-`;
 - a title that states the fix, not the investigation process;
 - `draft: true`;
-- a body that follows the repository pull request description style:
-  - `Fixes #<issue>` when a tracking issue exists, otherwise `Relates to
-    #<health_issue_number>`;
-  - `## Summary` with what changed and why;
-  - `## Root cause` with direct evidence and history;
-  - `## Validation` with exact commands and results;
-  - `## Multi-model review` with the three models, consolidated findings, fixes,
-    and any material dissent;
-  - `## Risk` with remaining limits and rollback guidance.
+- a body that first reads `.github/pull_request_template.md` and preserves its
+  section names and order;
+- a `## Summary` organized by clear categories so a reader can scan the change:
+  - `**Health-check correctness**`;
+  - `**Dashboard grooming**`;
+  - `**Automated remediation**`;
+  - `**Safety and limits**`;
+- a `## Related issue` section with `Fixes #<issue>` when a tracking issue
+  exists, otherwise `Relates to #<health_issue_number>`;
+- a `## Validation` section with exact commands, results, and live-run limits;
+- a completed `## Checklist` that uses the repository template items.
+
+Do not include model names, separate review findings, review verdicts, or
+review dissent in the pull request body. It is sufficient to state that the
+multi-model review completed and all blocking findings were addressed.
 
 Never enable auto-merge. Never mark the PR ready for review.
 If protected-file policy produces a fallback issue instead, report it as a
@@ -331,36 +339,3 @@ preview and cannot change GitHub state.
 - **One fix per PR**: Do not combine unrelated findings. If one root cause explains several failures, list every covered failure in the PR body.
 - **Existing fix wins**: If an open PR already fixes the root cause, do not create a duplicate. Link that PR in the report.
 - **Time-box yourself**: If evidence is insufficient after reasonable investigation, report what you found with appropriate confidence level rather than spiraling.
-
-<!-- markdownlint-disable MD003 -->
-
-## agent: `infra-review-claude`
----
-description: Reviews an infrastructure fix for correctness, safety, regression risk, and historical consistency
-model: claude-sonnet-5
----
-Review only the supplied evidence, diff, history, and test results. Identify
-blocking defects and high-confidence risks. Verify that the patch fixes the
-reported root cause without weakening controls or changing unrelated behavior.
-Quote evidence for every finding. Return `APPROVE` only when no blocking issue
-remains.
-
-## agent: `infra-review-gpt`
----
-description: Reviews an infrastructure fix for correctness, security, validation quality, and scope
-model: gpt-5.6-terra
----
-Review only the supplied evidence, diff, history, and test results. Check the
-failure-to-fix chain, test adequacy, security boundaries, error handling, and
-scope. Identify hidden behavior changes and artifact changes. Quote evidence for
-every finding. Return `APPROVE` only when no blocking issue remains.
-
-## agent: `infra-review-gemini`
----
-description: Reviews an infrastructure fix for alternative explanations, edge cases, and operational reliability
-model: gemini-3.7-flash
----
-Review only the supplied evidence, diff, history, and test results. Challenge the
-root-cause hypothesis, search for missed edge cases in the provided material,
-and assess operational reliability and rollback. Quote evidence for every
-finding. Return `APPROVE` only when no blocking issue remains.
