@@ -17,9 +17,9 @@ changes behavior or cannot preserve the relevant public/source contract, the cor
 not an implementation attempt:
 
 1. State: `Not a behavior-preserving refactor: <specific reason>.`
-2. State that no files were changed.
-3. Name the correct next workflow. Do not offer to perform the reclassified work inside this skill and
-   do not ask whether to proceed anyway.
+2. State: `No files changed.`
+3. State: `Next workflow: <workflow>.` Then stop. Do not add manual implementation steps, alternatives,
+   an offer to proceed without the workflow, or a follow-up question — even when that workflow is unavailable.
 
 | Requested as a "refactor" | Classification and action |
 |---|---|
@@ -71,7 +71,7 @@ Use the first matching row instead of applying the requested operation mechanica
 | Rename a member reached by a string, reflection, DI, or configuration | Rename binding-based callers; preserve the observed external name with a forwarding shim or metadata, and exercise the old-name path. | Rewrite an external/configured name just to make the new source name consistent. |
 | Extract duplicated logic whose callers pass different values | Extract the algorithm and pass each caller's existing inputs through unchanged. | Collapse distinct inputs, evaluation order, rounding, or side effects into one caller's version. |
 | Rename code compiled under `#if` or multiple TFMs | Update every source branch and validate each target framework explicitly. | Treat a green default-target build as evidence for unbuilt branches. |
-| Merge near-identical types | Parameterize only the values that differ, migrate every construction site, and preserve each old value exactly. | Introduce a new hierarchy or behavior that the consolidation did not require. |
+| Merge near-identical types | Parameterize only the values that differ, migrate every construction site, and preserve each old value exactly. If the old types are internal/unshipped and the request says to merge into one type, delete their declarations. | Retain unnecessary aliases, static holders, factories, or wrapper types that leave the requested merge incomplete; introduce a new hierarchy or behavior. |
 
 ## Preserve contracts beyond C# call sites
 
@@ -94,8 +94,9 @@ Confirm behavior is preserved after the edit — scaled to blast radius, not a f
   If the tree is already known-green, don't burn a second full "before" baseline — rely on the post-edit
   gate. Let the compiler catch missed references.
 - **Cross-boundary** (public/shipped symbol, multi-targeted project, `#if`/platform branches, or
-  `partial`/generated code): build/test **each** target framework (a green default build can hide a break
-  on another TFM), and run the hazards check below.
+  `partial`/generated code): establish a baseline, then run an explicit build and the relevant tests for
+  **each** target framework after the edit (a test command's implicit build is not separate build evidence;
+  a green default build can hide a break on another TFM), and run the hazards check below.
 
 Use the repo's own build/test workflow when it documents one (`README`/`CONTRIBUTING`, `build.*`, `eng/`,
 `global.json`, `.github/workflows`); its instructions win over any generic command. Otherwise:
