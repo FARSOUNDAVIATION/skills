@@ -240,7 +240,7 @@ stimuli:
     rubric:
       - Names IgniteUI.Blazor.Lite as the package to install for IgbCombo
       - Does not point the user at IgniteUI.Blazor.GridLite, which ships only the grid
-      - Covers what IgbCombo needs beyond the package: AddIgniteUIBlazor() registration, the IgniteUI.Blazor.Controls namespace, and a theme stylesheet in the host page
+      - "Covers what IgbCombo needs beyond the package: AddIgniteUIBlazor() registration, the IgniteUI.Blazor.Controls namespace, and a theme stylesheet in the host page"
       - Does not invent a per-component package name such as IgniteUI.Blazor.Combo
   - name: Stay dormant for a plain Blazor component request
     prompt: |
