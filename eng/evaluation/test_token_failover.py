@@ -154,6 +154,10 @@ class TokenFailoverTests(unittest.TestCase):
             investigate_frontmatter["safe-outputs"]["staged"],
             "${{ inputs.dry_run }}",
         )
+        self.assertEqual(
+            investigate_frontmatter["safe-outputs"]["report-failure-as-issue"],
+            "${{ !inputs.dry_run }}",
+        )
         self.assertTrue(create_pr["draft"])
         self.assertNotIn("allow-workflows", create_pr)
         self.assertEqual(create_pr["protected-files"], "fallback-to-issue")

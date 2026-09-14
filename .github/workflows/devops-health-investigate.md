@@ -58,6 +58,7 @@ tools:
 
 safe-outputs:
   staged: ${{ inputs.dry_run }}
+  report-failure-as-issue: ${{ !inputs.dry_run }}
   add-comment:
     max: 1
   create-pull-request:
