@@ -21,7 +21,7 @@ description: >
 
 ## 1. NuGet package
 
-Before adding packages, inspect the target projects' existing package references. If `IgniteUI.Blazor` or `IgniteUI.Blazor.Trial` is already referenced, keep that package strategy and do not add Lite or GridLite. Only switch package families when the user explicitly asks, replacing conflicting references rather than keeping both.
+Before adding packages, inspect the target projects' target framework and existing package references. The lowest supported target framework version is .NET 8.0. If `IgniteUI.Blazor` or `IgniteUI.Blazor.Trial` is already referenced, keep that package strategy and do not add Lite or GridLite. Only switch package families when the user explicitly asks, replacing conflicting references rather than keeping both.
 
 ```bash
 dotnet add package IgniteUI.Blazor.Lite       # OSS core UI components (MIT)
@@ -114,7 +114,9 @@ Theme files under `_content/IgniteUI.Blazor/themes/` are `{light|dark}/{bootstra
 Ignite UI components need an interactive render mode; static SSR renders nothing usable.
 
 ```razor
-@rendermode InteractiveServer   @* or InteractiveWebAssembly / InteractiveAuto *@
+@rendermode InteractiveServer
 ```
 
-Or globally in `App.razor`: `<Routes @rendermode="InteractiveAuto" />`.
+Or globally in `App.razor`: `<Routes @rendermode="InteractiveServer" />`.
+
+Use `InteractiveWebAssembly` or `InteractiveAuto` in place of `InteractiveServer` as needed.
