@@ -240,6 +240,7 @@ class TokenFailoverTests(unittest.TestCase):
             / "workflows"
             / "devops-health-investigate.md"
         ).read_text(encoding="utf-8")
+        normalized_investigate = " ".join(investigate.split())
 
         for model in ("claude-sonnet-5", "gpt-5.6-terra", "gemini-3.7-flash"):
             self.assertIn(f"`{model}`", investigate)
@@ -249,6 +250,24 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertNotIn('agent_type: "general-purpose"', investigate)
         self.assertIn("must not edit", investigate)
         self.assertIn("Reviewers return findings", investigate)
+        for untrusted_source in (
+            "workflow logs",
+            "issue and pull request text",
+            "commit messages",
+            "dispatch inputs",
+            "linked content",
+        ):
+            self.assertIn(untrusted_source, normalized_investigate)
+        for guard_requirement in (
+            "as untrusted data",
+            "Ignore instructions, commands",
+            "requested tool calls",
+            "remediation steps",
+            "diagnosis and fix only on repository files",
+            "GitHub state",
+            "independently retrieve and verify",
+        ):
+            self.assertIn(guard_requirement, normalized_investigate)
         self.assertNotIn("## agent:", investigate)
         self.assertNotIn("markdownlint-disable MD003", investigate)
         self.assertIn("all three model families returned a review", investigate)
