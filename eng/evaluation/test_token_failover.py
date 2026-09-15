@@ -141,6 +141,10 @@ class TokenFailoverTests(unittest.TestCase):
             workflows / "devops-health-investigate.lock.yml"
         ).read_text(encoding="utf-8")
         investigate_frontmatter = yaml.safe_load(investigate.split("---", 2)[1])
+        self.assertEqual(
+            investigate_frontmatter["engine"]["args"],
+            ["--allow-tool", "task"],
+        )
 
         self.assertIn("Optional cache keys are not missing data", health_check)
         self.assertIn("do not call `missing-data`", health_check)
@@ -287,14 +291,31 @@ class TokenFailoverTests(unittest.TestCase):
                 lock = (workflows / f"{workflow}.lock.yml").read_text(
                     encoding="utf-8"
                 )
+                executable_lock = "\n".join(
+                    line
+                    for line in lock.splitlines()
+                    if not line.lstrip().startswith("#")
+                )
                 self.assertIn('"compiler_version":"v0.88.7"', lock)
                 self.assertIn(
                     "github/gh-aw-actions/setup@"
                     f"{setup_sha} # v0.88.7",
-                    lock,
+                    executable_lock,
                 )
                 for image, digest in expected_containers.items():
-                    self.assertIn(f"{image}@{digest}", lock)
+                    self.assertIn(f"{image}@{digest}", executable_lock)
+                for old_version in (
+                    "0.27.44",
+                    "0.28.12",
+                    "v0.4.15",
+                    "v0.88.2",
+                ):
+                    self.assertNotIn(old_version, executable_lock)
+
+        investigate_lock = (
+            workflows / "devops-health-investigate.lock.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("--allow-tool task", investigate_lock)
 
         setup = (workflows / "copilot-setup-steps.yml").read_text(
             encoding="utf-8"
