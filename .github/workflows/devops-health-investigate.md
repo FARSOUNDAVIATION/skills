@@ -232,15 +232,17 @@ Before creating a pull request, prepare one review brief with:
 - risks, assumptions, and blast radius.
 
 Run a multi-model review by sending the same brief to three independent
-`task` subagents. Use `agent_type: "general-purpose"` and one model from each
-required family:
+`task` subagents. Use the read-only `agent_type: "code-review"` and one model
+from each required family:
 
 1. `claude-sonnet-5`
 2. `gpt-5.6-terra`
 3. `gemini-3.7-flash`
 
 Keep each response as separate review evidence. Do not write a review on a
-subagent's behalf.
+subagent's behalf. Each review task must state that the reviewer must not edit
+files, change the worktree, or run mutating commands. Reviewers return findings
+only.
 
 Each reviewer must check correctness, security, performance, maintainability,
 customer regression risk, whether the change matches the finding, whether
