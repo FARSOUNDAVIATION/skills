@@ -46,7 +46,7 @@ safe-outputs:
   dispatch-workflow:
     workflows:
       - devops-health-investigate
-    max: 5
+    max: 2
   noop:
     report-as-issue: false
 

@@ -132,6 +132,11 @@ class TokenFailoverTests(unittest.TestCase):
         health_check = (workflows / "devops-health-check.md").read_text(
             encoding="utf-8"
         )
+        health_frontmatter = yaml.safe_load(health_check.split("---", 2)[1])
+        health_lock_text = (
+            workflows / "devops-health-check.lock.yml"
+        ).read_text(encoding="utf-8")
+        health_lock = yaml.safe_load(health_lock_text)
         groom_source = workflows / "devops-health-groom.md"
         groom = groom_source.read_text(encoding="utf-8")
         groom_frontmatter = yaml.safe_load(groom.split("---", 2)[1])
@@ -139,6 +144,35 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Optional cache keys are not missing data", health_check)
         self.assertIn("do not call `missing-data`", health_check)
         self.assertIn("If `update-issue`, `add-comment`, or `dispatch-workflow`", health_check)
+        self.assertEqual(
+            health_frontmatter["safe-outputs"]["dispatch-workflow"]["max"],
+            2,
+        )
+        generated_dispatch_configs: list[dict[str, object]] = []
+
+        def collect_dispatch_configs(value: object) -> None:
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    if key in {
+                        "GH_AW_SAFE_OUTPUTS_CONFIG",
+                        "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+                    }:
+                        generated_dispatch_configs.append(
+                            json.loads(str(child))["dispatch_workflow"]
+                        )
+                    collect_dispatch_configs(child)
+            elif isinstance(value, list):
+                for child in value:
+                    collect_dispatch_configs(child)
+
+        collect_dispatch_configs(health_lock)
+        self.assertEqual(len(generated_dispatch_configs), 2)
+        for config in generated_dispatch_configs:
+            self.assertEqual(config["max"], 2)
+        self.assertIn(
+            "dispatch-workflow [devops_health_investigate](max:2 total)",
+            health_lock_text,
+        )
         self.assertTrue(groom_frontmatter["tools"]["cli-proxy"])
         self.assertIn("Do not finish with only a text response", groom)
 
