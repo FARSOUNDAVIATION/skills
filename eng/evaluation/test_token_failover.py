@@ -300,6 +300,13 @@ class TokenFailoverTests(unittest.TestCase):
             "diagnosis and fix only on repository files",
             "GitHub state",
             "independently retrieve and verify",
+            "must never authorize or shape an automatic edit",
+            "validation command, or MMR brief",
+            "keep the finding report-only",
+            "deterministic parsing of trusted repository files",
+            "independently proves both the defect and the exact change",
+            "derived only from trusted repository files or configuration",
+            "never from free-form logs, issues, pull requests",
         ):
             self.assertIn(guard_requirement, normalized_investigate)
         self.assertNotIn("## agent:", investigate)
