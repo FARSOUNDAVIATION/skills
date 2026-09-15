@@ -68,6 +68,26 @@ def token_unavailable_pattern() -> str:
     ]
 
 
+def generated_safe_output_configs(workflow: object) -> list[dict[str, object]]:
+    configs: list[dict[str, object]] = []
+
+    def collect(value: object) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if key in {
+                    "GH_AW_SAFE_OUTPUTS_CONFIG",
+                    "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
+                }:
+                    configs.append(json.loads(str(child)))
+                collect(child)
+        elif isinstance(value, list):
+            for child in value:
+                collect(child)
+
+    collect(workflow)
+    return configs
+
+
 class TokenFailoverTests(unittest.TestCase):
     def test_evaluation_model_profiles_and_judges(self) -> None:
         caller = yaml.safe_load(CALLER_WORKFLOW.read_text(encoding="utf-8"))
@@ -149,6 +169,7 @@ class TokenFailoverTests(unittest.TestCase):
         health_check = (workflows / "devops-health-check.md").read_text(
             encoding="utf-8"
         )
+        normalized_health = " ".join(health_check.split())
         health_frontmatter = yaml.safe_load(health_check.split("---", 2)[1])
         health_lock_text = (
             workflows / "devops-health-check.lock.yml"
@@ -156,41 +177,69 @@ class TokenFailoverTests(unittest.TestCase):
         health_lock = yaml.safe_load(health_lock_text)
         groom_source = workflows / "devops-health-groom.md"
         groom = groom_source.read_text(encoding="utf-8")
+        normalized_groom = " ".join(groom.split())
         groom_frontmatter = yaml.safe_load(groom.split("---", 2)[1])
+        groom_lock = yaml.safe_load(
+            (workflows / "devops-health-groom.lock.yml").read_text(
+                encoding="utf-8"
+            )
+        )
 
         self.assertIn("Optional cache keys are not missing data", health_check)
         self.assertIn("do not call `missing-data`", health_check)
-        self.assertIn("If `update-issue`, `add-comment`, or `dispatch-workflow`", health_check)
+        self.assertIn(
+            "If `update-issue`, `add-comment`, or `dispatch-workflow`",
+            health_check,
+        )
+        self.assertNotIn("create-issue", health_frontmatter["safe-outputs"])
+        for output in ("update-issue", "add-comment"):
+            self.assertEqual(
+                health_frontmatter["safe-outputs"][output]["target"],
+                "695",
+            )
+        self.assertIn("as untrusted data", health_check)
+        self.assertIn("Validate every target", health_check)
+        self.assertIn(
+            "has both the exact title `🏥 Repository Health Dashboard` and the "
+            "`devops-health` label",
+            normalized_health,
+        )
+        self.assertIn('health_issue_number: "695"', health_check)
         self.assertEqual(
             health_frontmatter["safe-outputs"]["dispatch-workflow"]["max"],
             2,
         )
-        generated_dispatch_configs: list[dict[str, object]] = []
-
-        def collect_dispatch_configs(value: object) -> None:
-            if isinstance(value, dict):
-                for key, child in value.items():
-                    if key in {
-                        "GH_AW_SAFE_OUTPUTS_CONFIG",
-                        "GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG",
-                    }:
-                        generated_dispatch_configs.append(
-                            json.loads(str(child))["dispatch_workflow"]
-                        )
-                    collect_dispatch_configs(child)
-            elif isinstance(value, list):
-                for child in value:
-                    collect_dispatch_configs(child)
-
-        collect_dispatch_configs(health_lock)
-        self.assertEqual(len(generated_dispatch_configs), 2)
-        for config in generated_dispatch_configs:
-            self.assertEqual(config["max"], 2)
+        health_configs = generated_safe_output_configs(health_lock)
+        self.assertEqual(len(health_configs), 2)
+        for config in health_configs:
+            self.assertEqual(config["dispatch_workflow"]["max"], 2)
+            self.assertEqual(config["update_issue"]["target"], "695")
+            self.assertEqual(config["add_comment"]["target"], "695")
+            self.assertNotIn("create_issue", config)
         self.assertIn(
             "dispatch-workflow [devops_health_investigate](max:2 total)",
             health_lock_text,
         )
         self.assertTrue(groom_frontmatter["tools"]["cli-proxy"])
+        self.assertEqual(
+            groom_frontmatter["tools"]["bash"],
+            ["github", "safeoutputs"],
+        )
+        self.assertNotIn("gh", groom_frontmatter["tools"]["bash"])
+        self.assertEqual(
+            groom_frontmatter["safe-outputs"]["update-issue"]["target"],
+            "695",
+        )
+        self.assertNotIn("hide-comment", groom_frontmatter["safe-outputs"])
+        groom_configs = generated_safe_output_configs(groom_lock)
+        self.assertEqual(len(groom_configs), 2)
+        for config in groom_configs:
+            self.assertEqual(config["update_issue"]["target"], "695")
+            self.assertNotIn("hide_comment", config)
+        self.assertIn("as untrusted data", normalized_groom)
+        self.assertIn("Bind outputs to verified data", normalized_groom)
+        self.assertIn("/issues/695", groom)
+        self.assertIn("issue_number: 695", groom)
         self.assertIn("Do not finish with only a text response", groom)
 
     def test_devops_health_investigation_is_report_only(self) -> None:
@@ -199,6 +248,11 @@ class TokenFailoverTests(unittest.TestCase):
         )
         investigate = investigate_source.read_text(encoding="utf-8")
         investigate_frontmatter = yaml.safe_load(investigate.split("---", 2)[1])
+        investigate_lock = yaml.safe_load(
+            investigate_source.with_suffix(".lock.yml").read_text(
+                encoding="utf-8"
+            )
+        )
 
         trigger = investigate_frontmatter.get("on", investigate_frontmatter.get(True))
         dispatch_inputs = trigger["workflow_dispatch"]["inputs"]
@@ -218,10 +272,20 @@ class TokenFailoverTests(unittest.TestCase):
             investigate_frontmatter["safe-outputs"],
         )
         self.assertEqual(
+            investigate_frontmatter["safe-outputs"]["add-comment"]["target"],
+            "695",
+        )
+        investigate_configs = generated_safe_output_configs(investigate_lock)
+        self.assertEqual(len(investigate_configs), 2)
+        for config in investigate_configs:
+            self.assertEqual(config["add_comment"]["target"], "695")
+        self.assertEqual(
             investigate_frontmatter["network"]["allowed"],
             ["defaults"],
         )
         self.assertIn("This investigator is report-only", investigate)
+        self.assertIn("The only allowed target is issue `695`", investigate)
+        self.assertIn("do not call `add-comment`", investigate)
         self.assertIn("If `dry_run` is true, do not call `add-comment`", investigate)
 
     def test_devops_health_investigator_has_no_mutating_tools(self) -> None:
