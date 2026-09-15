@@ -185,8 +185,8 @@ class TokenFailoverTests(unittest.TestCase):
             )
         )
 
-        self.assertIn("Optional cache keys are not missing data", health_check)
-        self.assertIn("do not call `missing-data`", health_check)
+        self.assertIn("Missing prior state is not missing data", health_check)
+        self.assertIn("Do not call `missing-data`", health_check)
         self.assertIn(
             "If `update-issue`, `add-comment`, or `dispatch-workflow`",
             health_check,
@@ -220,13 +220,9 @@ class TokenFailoverTests(unittest.TestCase):
             "dispatch-workflow [devops_health_investigate](max:2 total)",
             health_lock_text,
         )
-        self.assertTrue(groom_frontmatter["tools"]["cli-proxy"])
+        self.assertFalse(groom_frontmatter["tools"]["cli-proxy"])
         self.assertFalse(groom_frontmatter["tools"]["edit"])
-        self.assertEqual(
-            groom_frontmatter["tools"]["bash"],
-            ["github", "safeoutputs"],
-        )
-        self.assertNotIn("gh", groom_frontmatter["tools"]["bash"])
+        self.assertFalse(groom_frontmatter["tools"]["bash"])
         self.assertEqual(
             groom_frontmatter["safe-outputs"]["update-issue"]["target"],
             "695",
@@ -240,12 +236,44 @@ class TokenFailoverTests(unittest.TestCase):
         groom_lock_text = (
             workflows / "devops-health-groom.lock.yml"
         ).read_text(encoding="utf-8")
+        self.assertNotIn("--allow-all-tools", groom_lock_text)
         self.assertNotIn("--allow-tool write", groom_lock_text)
+        self.assertNotIn("shell(yq)", groom_lock_text)
+        self.assertIn("--allow-tool github", groom_lock_text)
+        self.assertIn("--allow-tool safeoutputs", groom_lock_text)
         self.assertIn("as untrusted data", normalized_groom)
         self.assertIn("Bind outputs to verified data", normalized_groom)
         self.assertIn("/issues/695", groom)
         self.assertIn("issue_number: 695", groom)
         self.assertIn("Do not finish with only a text response", groom)
+
+        self.assertFalse(health_frontmatter["tools"]["bash"])
+        self.assertFalse(health_frontmatter["tools"]["cli-proxy"])
+        self.assertFalse(health_frontmatter["tools"]["edit"])
+        self.assertNotIn("cache-memory", health_frontmatter["tools"])
+        self.assertNotIn("--allow-all-tools", health_lock_text)
+        self.assertNotIn("--allow-tool write", health_lock_text)
+        self.assertNotIn("shell(git:*)", health_lock_text)
+        self.assertNotIn("shell(yq)", health_lock_text)
+        self.assertIn("--allow-tool github", health_lock_text)
+        self.assertIn("--allow-tool safeoutputs", health_lock_text)
+        self.assertNotIn("cache_memory_prompt.md", health_lock_text)
+        self.assertNotIn("Create cache-memory directory", health_lock_text)
+        self.assertNotIn("update_cache_memory:", health_lock_text)
+        self.assertIn("devops-health-state:v1", health_check)
+        self.assertIn("One-time legacy migration", health_check)
+        self.assertIn("final `# 🏥 Daily Health Check", health_check)
+        self.assertNotIn("/git/trees/", health_check)
+        self.assertIn("search_code: filename:plugin.json path:plugins", health_check)
+        self.assertIn("search_code: filename:SKILL.md path:plugins", health_check)
+        self.assertIn("If code search reaches its result limit", health_check)
+        shared_health = (
+            REPO_ROOT / ".github" / "aw" / "shared" / "devops-health.lock.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "The safe-output issue update is the only persistence operation",
+            " ".join(shared_health.split()),
+        )
 
     def test_devops_health_investigation_is_report_only(self) -> None:
         investigate_source = (
@@ -391,7 +419,7 @@ class TokenFailoverTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertNotIn("`health-dashboard-issue`", shared_health)
         self.assertIn(
-            "The dashboard target is the static issue number `695`",
+            "Issue `695` is both the human-readable dashboard and the bounded persistence",
             shared_health,
         )
 
