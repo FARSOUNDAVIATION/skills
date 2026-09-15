@@ -169,6 +169,13 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertFalse(
             any(path.startswith(".github/") for path in create_pr["allowed-files"])
         )
+        self.assertTrue(
+            {
+                "plugins/*/plugin.json",
+                "plugins/*/.claude-plugin/plugin.json",
+                "plugins/*/.codex-plugin/plugin.json",
+            }.issubset(create_pr["allowed-files"])
+        )
         self.assertLessEqual(create_pr["max-patch-files"], 20)
         self.assertNotIn("gh", investigate_frontmatter["tools"]["bash"])
         self.assertNotIn("git", investigate_frontmatter["tools"]["bash"])
@@ -200,6 +207,10 @@ class TokenFailoverTests(unittest.TestCase):
             },
         )
         self.assertIn("shell(dotnet:*)", investigate_lock)
+        self.assertIn("as one byte-identical set", investigate)
+        self.assertIn("Do not create a PR for a partial manifest set", investigate)
+        self.assertIn("Do not change a manifest", investigate)
+        self.assertIn("leave version stamping", investigate)
         self.assertEqual(
             investigate_frontmatter["network"]["allowed"],
             ["defaults", "dotnet"],

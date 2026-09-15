@@ -71,6 +71,8 @@ safe-outputs:
     allowed-files:
       - "eng/**"
       - "plugins/*/plugin.json"
+      - "plugins/*/.claude-plugin/plugin.json"
+      - "plugins/*/.codex-plugin/plugin.json"
       - "Directory.Build.*"
   noop:
     report-as-issue: false
@@ -174,6 +176,8 @@ An automatic fix is eligible only when all conditions are true:
 6. A targeted validation can reproduce the failure or prove the configuration
    defect, and the same validation passes after the change.
 7. No existing open pull request already contains an equivalent fix.
+8. A plugin manifest fix updates `plugin.json`, `.claude-plugin/plugin.json`,
+   and `.codex-plugin/plugin.json` as one byte-identical set.
 
 If any condition is false or uncertain, do not edit files. Report the evidence,
 the suggested fix, and the owner who must take the next action.
@@ -209,6 +213,13 @@ install Node.js, Python, PowerShell, `npm`, `npx`, or ordinary `gh`. The
 compiler injects narrowly scoped Git commands required to prepare the
 `create-pull-request` output. Use them only for that purpose, not for
 investigation or validation.
+
+For a plugin manifest fix, apply the same final content to all three manifests.
+Use `diff` to prove that both companion manifests are byte-identical to the
+root manifest. Then run
+`dotnet run --project eng/skill-validator/src -- check --plugin ./plugins/<plugin-name>`.
+Do not create a PR for a partial manifest set. Do not change a manifest
+`version` field; leave version stamping to the repository versioning automation.
 
 ### Step 6: Mandatory Multi-Model Review
 
