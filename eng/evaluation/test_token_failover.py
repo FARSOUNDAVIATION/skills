@@ -127,7 +127,7 @@ class TokenFailoverTests(unittest.TestCase):
                 )
                 self.assertEqual(frontmatter["environment"], "copilot-pat-pool")
 
-    def test_devops_health_automation_can_safely_propose_fixes(self) -> None:
+    def test_devops_health_guidance_handles_expected_outputs(self) -> None:
         workflows = REPO_ROOT / ".github" / "workflows"
         health_check = (workflows / "devops-health-check.md").read_text(
             encoding="utf-8"
@@ -135,22 +135,19 @@ class TokenFailoverTests(unittest.TestCase):
         groom_source = workflows / "devops-health-groom.md"
         groom = groom_source.read_text(encoding="utf-8")
         groom_frontmatter = yaml.safe_load(groom.split("---", 2)[1])
-        investigate_source = workflows / "devops-health-investigate.md"
-        investigate = investigate_source.read_text(encoding="utf-8")
-        investigate_lock = (
-            workflows / "devops-health-investigate.lock.yml"
-        ).read_text(encoding="utf-8")
-        investigate_frontmatter = yaml.safe_load(investigate.split("---", 2)[1])
-        self.assertEqual(
-            investigate_frontmatter["engine"]["args"],
-            ["--allow-tool", "task"],
-        )
 
         self.assertIn("Optional cache keys are not missing data", health_check)
         self.assertIn("do not call `missing-data`", health_check)
         self.assertIn("If `update-issue`, `add-comment`, or `dispatch-workflow`", health_check)
         self.assertTrue(groom_frontmatter["tools"]["cli-proxy"])
         self.assertIn("Do not finish with only a text response", groom)
+
+    def test_devops_health_repairs_are_bounded_and_dry_run_aware(self) -> None:
+        investigate_source = (
+            REPO_ROOT / ".github" / "workflows" / "devops-health-investigate.md"
+        )
+        investigate = investigate_source.read_text(encoding="utf-8")
+        investigate_frontmatter = yaml.safe_load(investigate.split("---", 2)[1])
 
         trigger = investigate_frontmatter.get("on", investigate_frontmatter.get(True))
         dispatch_inputs = trigger["workflow_dispatch"]["inputs"]
@@ -181,6 +178,25 @@ class TokenFailoverTests(unittest.TestCase):
             }.issubset(create_pr["allowed-files"])
         )
         self.assertLessEqual(create_pr["max-patch-files"], 20)
+        self.assertEqual(
+            investigate_frontmatter["network"]["allowed"],
+            ["defaults", "dotnet"],
+        )
+        self.assertIn("If `dry_run` is true, skip this step", investigate)
+
+    def test_devops_health_repair_tools_are_restricted(self) -> None:
+        workflows = REPO_ROOT / ".github" / "workflows"
+        investigate_source = workflows / "devops-health-investigate.md"
+        investigate = investigate_source.read_text(encoding="utf-8")
+        investigate_lock = (
+            workflows / "devops-health-investigate.lock.yml"
+        ).read_text(encoding="utf-8")
+        investigate_frontmatter = yaml.safe_load(investigate.split("---", 2)[1])
+
+        self.assertEqual(
+            investigate_frontmatter["engine"]["args"],
+            ["--allow-tool", "task"],
+        )
         self.assertNotIn("gh", investigate_frontmatter["tools"]["bash"])
         self.assertNotIn("git", investigate_frontmatter["tools"]["bash"])
         self.assertNotIn("npx", investigate_frontmatter["tools"]["bash"])
@@ -215,11 +231,15 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Do not create a PR for a partial manifest set", investigate)
         self.assertIn("Do not change a manifest", investigate)
         self.assertIn("leave version stamping", investigate)
-        self.assertEqual(
-            investigate_frontmatter["network"]["allowed"],
-            ["defaults", "dotnet"],
-        )
         self.assertNotIn("gh aw compile", investigate)
+
+    def test_devops_health_repair_prompt_requires_read_only_mmr(self) -> None:
+        investigate = (
+            REPO_ROOT
+            / ".github"
+            / "workflows"
+            / "devops-health-investigate.md"
+        ).read_text(encoding="utf-8")
 
         for model in ("claude-sonnet-5", "gpt-5.6-terra", "gemini-3.7-flash"):
             self.assertIn(f"`{model}`", investigate)
@@ -232,7 +252,6 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertNotIn("## agent:", investigate)
         self.assertNotIn("markdownlint-disable MD003", investigate)
         self.assertIn("all three model families returned a review", investigate)
-        self.assertIn("If `dry_run` is true, skip this step", investigate)
         self.assertIn("`noop` exactly once", investigate)
         self.assertIn("reads `.github/pull_request_template.md`", investigate)
         self.assertIn("finding-relevant categories", investigate)
