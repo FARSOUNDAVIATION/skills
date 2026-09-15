@@ -221,6 +221,7 @@ class TokenFailoverTests(unittest.TestCase):
             health_lock_text,
         )
         self.assertTrue(groom_frontmatter["tools"]["cli-proxy"])
+        self.assertFalse(groom_frontmatter["tools"]["edit"])
         self.assertEqual(
             groom_frontmatter["tools"]["bash"],
             ["github", "safeoutputs"],
@@ -236,6 +237,10 @@ class TokenFailoverTests(unittest.TestCase):
         for config in groom_configs:
             self.assertEqual(config["update_issue"]["target"], "695")
             self.assertNotIn("hide_comment", config)
+        groom_lock_text = (
+            workflows / "devops-health-groom.lock.yml"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("--allow-tool write", groom_lock_text)
         self.assertIn("as untrusted data", normalized_groom)
         self.assertIn("Bind outputs to verified data", normalized_groom)
         self.assertIn("/issues/695", groom)
@@ -292,6 +297,7 @@ class TokenFailoverTests(unittest.TestCase):
         workflows = REPO_ROOT / ".github" / "workflows"
         investigate_source = workflows / "devops-health-investigate.md"
         investigate = investigate_source.read_text(encoding="utf-8")
+        normalized_investigate = " ".join(investigate.split())
         investigate_lock = (
             workflows / "devops-health-investigate.lock.yml"
         ).read_text(encoding="utf-8")
@@ -299,17 +305,23 @@ class TokenFailoverTests(unittest.TestCase):
 
         self.assertNotIn("args", investigate_frontmatter["engine"])
         self.assertFalse(investigate_frontmatter["tools"]["edit"])
-        self.assertNotIn("gh", investigate_frontmatter["tools"]["bash"])
-        self.assertNotIn("git", investigate_frontmatter["tools"]["bash"])
-        self.assertNotIn("npx", investigate_frontmatter["tools"]["bash"])
-        self.assertNotIn("npm", investigate_frontmatter["tools"]["bash"])
-        self.assertNotIn("node", investigate_frontmatter["tools"]["bash"])
-        self.assertNotIn("python", investigate_frontmatter["tools"]["bash"])
-        self.assertNotIn("python3", investigate_frontmatter["tools"]["bash"])
-        self.assertNotIn("pwsh", investigate_frontmatter["tools"]["bash"])
-        self.assertNotIn("dotnet", investigate_frontmatter["tools"]["bash"])
-        self.assertNotIn("find", investigate_frontmatter["tools"]["bash"])
+        self.assertFalse(investigate_frontmatter["tools"]["bash"])
+        self.assertFalse(investigate_frontmatter["tools"]["cli-proxy"])
+        self.assertNotIn("--allow-all-tools", investigate_lock)
+        self.assertIn("--allow-tool github", investigate_lock)
+        self.assertIn("--allow-tool safeoutputs", investigate_lock)
         for blocked_tool in (
+            "shell(cat)",
+            "shell(date)",
+            "shell(diff)",
+            "shell(grep)",
+            "shell(head)",
+            "shell(jq)",
+            "shell(ls)",
+            "shell(sort)",
+            "shell(tail)",
+            "shell(wc)",
+            "shell(yq)",
             "shell(git:*)",
             "shell(git add:*)",
             "shell(git commit:*)",
@@ -328,6 +340,10 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("invoke subagents", investigate)
         self.assertIn("create branches, commit changes", investigate)
         self.assertNotIn("gh aw compile", investigate)
+        self.assertIn("### Step 0: Validate Dispatch Inputs", investigate)
+        self.assertIn("the exact `github.com` host", normalized_investigate)
+        self.assertIn("actions/runs/{numeric_run_id}", investigate)
+        self.assertIn("Do not invoke a playbook", normalized_investigate)
 
     def test_devops_health_report_only_prompt_rejects_untrusted_actions(self) -> None:
         investigate = (
@@ -370,6 +386,14 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("`noop` exactly once", investigate)
         self.assertIn("### Remediation Status", investigate)
         self.assertIn("Report-only.", investigate)
+        shared_health = (
+            REPO_ROOT / ".github" / "aw" / "shared" / "devops-health.lock.md"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("`health-dashboard-issue`", shared_health)
+        self.assertIn(
+            "The dashboard target is the static issue number `695`",
+            shared_health,
+        )
 
     def test_gh_aw_runtime_upgrade_is_complete(self) -> None:
         workflows = REPO_ROOT / ".github" / "workflows"

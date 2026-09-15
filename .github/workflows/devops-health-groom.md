@@ -26,6 +26,7 @@ permissions:
 tools:
   bash: ["github", "safeoutputs"]
   cli-proxy: true
+  edit: false
   github:
     toolsets: [repos, issues, actions]
     min-integrity: none
