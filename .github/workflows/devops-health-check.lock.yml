@@ -618,7 +618,7 @@ jobs:
                       },
                       "dry_run": {
                         "default": false,
-                        "description": "Investigate and validate without posting comments or creating a PR",
+                        "description": "Investigate without posting a comment",
                         "type": "boolean"
                       },
                       "finding_id": {
