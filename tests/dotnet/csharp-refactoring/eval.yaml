@@ -76,6 +76,19 @@ stimuli:
             and 'ParseIntSetting(' not in ordinary_tests else 1)"
           expected_exit_code: 0
           timeout: 1m
+      - &fixture-integrity
+        type: run-command
+        config:
+          command: >-
+            python3 -c "from pathlib import Path; import re, sys;
+            expected = '<TargetFrameworks>net8.0;net10.0</TargetFrameworks>';
+            source_project = Path('src/Billing/Billing.csproj').read_text();
+            test_project = Path('tests/Billing.Tests/Billing.Tests.csproj').read_text();
+            tests = Path('tests/Billing.Tests/BillingTests.cs').read_text();
+            sys.exit(0 if expected in source_project and expected in test_project
+            and len(re.findall(r'\[Fact\]', tests)) >= 17 else 1)"
+          expected_exit_code: 0
+          timeout: 1m
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal
@@ -116,6 +129,7 @@ stimuli:
         config:
           path: src/Billing/Coupons.g.cs.template
           value: private static decimal RateFor(
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal
@@ -143,6 +157,8 @@ stimuli:
             match = re.search(r'class\s+ConfigReader\b[^{]*\{(?P<body>.*?)\n\}', text, re.S);
             body = match.group('body') if match else '';
             sys.exit(0 if 'ReadInt' in body and 'ReadBool' in body
+            and 'AppSettingsHelper.ParseIntSetting' in body
+            and 'AppSettingsHelper.ParseBoolSetting' in body
             and 'TryParse' not in body else 1)"
           expected_exit_code: 0
           timeout: 1m
@@ -150,6 +166,7 @@ stimuli:
         config:
           path: src/Billing/PublicAPI.Shipped.txt
           value: Billing.ConfigReader
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal
@@ -178,6 +195,7 @@ stimuli:
         config:
           path: src/Billing/Pricing.cs
           value: ApplyTaxWrapper
+      - *fixture-integrity
       - type: prompt
     rubric:
       - Finds the true binding references to the wrapper before removing it, not just textual matches
@@ -206,6 +224,7 @@ stimuli:
         config:
           path: src/Billing/Pricing.cs
           value: class SilverPricing
+      - *fixture-integrity
       - type: prompt
     rubric:
       - Merges the two classes into a single type parameterized by name and rate, preserving each tier's values
@@ -277,6 +296,7 @@ stimuli:
         config:
           path: src/Billing/OrderProcessor.cs
           value: subtotal >= 100m
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal
@@ -304,6 +324,7 @@ stimuli:
         config:
           path: tests/Billing.Tests/BillingTests.cs
           value: LoyaltyLevel = "gold"
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal
@@ -327,6 +348,7 @@ stimuli:
         config:
           path: src/Billing/PublicAPI.Shipped.txt
           value: ParseBoolSetting(string? raw, bool fallback)
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal
@@ -359,6 +381,7 @@ stimuli:
         config:
           path: src/Billing/CollisionExamples.cs
           value: DoStuff is shown in migration notes.
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal
@@ -394,6 +417,7 @@ stimuli:
             sys.exit(0 if 'foreach' not in method and 'CalculateSubtotal(lines)' in method else 1)"
           expected_exit_code: 0
           timeout: 1m
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal
@@ -425,6 +449,7 @@ stimuli:
         config:
           path: tests/Billing.Tests/BillingTests.cs
           value: PricingMath.ApplyDiscount
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal
@@ -467,11 +492,18 @@ stimuli:
             compatibility_test = re.search(
             r'LegacyCurrencyFormatter_RemainsCompatible\s*\(\)\s*\{(?P<body>.*?)\n\s*\}',
             tests, re.S);
+            ordinary_caller = re.search(
+            r'RenderCurrency\s*\([^)]*\)\s*(?:=>|\{)(?P<body>.*?)(?:;|\})',
+            source, re.S);
             sys.exit(0 if shim and 'CurrencyFormatter.Format' in shim.group('body')
             and compatibility_test and 'LegacyCurrencyFormatter.FormatCurrency('
-            in compatibility_test.group('body') else 1)"
+            in compatibility_test.group('body')
+            and ordinary_caller and 'CurrencyFormatter.Format' in ordinary_caller.group('body')
+            and 'LegacyCurrencyFormatter.FormatCurrency' not in ordinary_caller.group('body')
+            else 1)"
           expected_exit_code: 0
           timeout: 1m
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal
@@ -508,6 +540,7 @@ stimuli:
             and 'InvokeConfigured(\"RenderReceipt\", 12.5m)' in tests else 1)"
           expected_exit_code: 0
           timeout: 1m
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal
@@ -536,6 +569,7 @@ stimuli:
             sys.exit(0 if not re.search(r'\bLabel\s*\(', text) else 1)"
           expected_exit_code: 0
           timeout: 1m
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --framework net8.0 --verbosity normal
@@ -571,6 +605,7 @@ stimuli:
             and text.count('tier == \"silver\"') == 1 else 1)"
           expected_exit_code: 0
           timeout: 1m
+      - *fixture-integrity
       - type: run-command
         config:
           command: dotnet test Fixture.sln --verbosity normal

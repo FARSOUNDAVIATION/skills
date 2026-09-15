@@ -45,6 +45,8 @@ internal sealed class ReceiptRenderer
 {
     public string RenderDirect(decimal amount) => RenderReceipt(amount);
 
+    public string RenderCurrency(decimal amount) => LegacyCurrencyFormatter.FormatCurrency(amount);
+
     public string InvokeConfigured(string methodName, decimal amount)
     {
         var method = typeof(ReceiptRenderer).GetMethod(

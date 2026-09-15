@@ -85,6 +85,12 @@ public class BillingTests
     }
 
     [Fact]
+    public void ReceiptRenderer_FormatsCurrency()
+    {
+        Assert.Equal("$12.50", new ReceiptRenderer().RenderCurrency(12.5m));
+    }
+
+    [Fact]
     public void ReceiptRenderer_ConfiguredOldName_RemainsCompatible()
     {
         var renderer = new ReceiptRenderer();

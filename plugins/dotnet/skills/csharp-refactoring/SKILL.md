@@ -10,11 +10,12 @@ A refactor changes **structure**, never observable **behavior**. Do the edit wit
 then confirm behavior held with a build + the relevant tests. Keep the effort proportional to the change:
 a one-line local rename does not need the ceremony a public multi-targeted change does.
 
-## Mandatory gate: classify before searching or editing
+## Mandatory gate: classify before validation or editing
 
-Do this before reading project files, restoring, building, or making an edit. If the requested operation
-changes behavior or cannot preserve the relevant public/source contract, the correct result of this skill is a decisive handoff,
-not an implementation attempt:
+Read only enough repository context to classify the request. Do this before restoring, building, or
+making an edit. If the entire requested operation changes behavior or cannot preserve the relevant
+public/source contract, the correct result of this skill is a decisive handoff, not an implementation
+attempt:
 
 1. State: `Not a behavior-preserving refactor: <specific reason>.`
 2. State: `No files changed.`
@@ -24,12 +25,14 @@ not an implementation attempt:
 | Requested as a "refactor" | Classification and action |
 |---|---|
 | Framework or NuGet version change | **Upgrade.** Do not edit or validate the upgrade here; hand off to `dotnet-upgrade`. |
-| New capability, flag, endpoint, tier, or behavior | **Feature.** Do not implement it in this workflow. |
-| Threshold, rate, output, or bug-result change | **Behavior change.** Defer it unless separately authorized outside the refactor. |
-| Tighten or loosen a shipped/public nullable annotation | **Source-contract change.** Leave the declaration and API record unchanged. |
+| New capability, flag, endpoint, tier, or behavior | **Feature.** Do not implement it here; hand off to the repository's feature workflow. |
+| Threshold, rate, output, or bug-result change | **Behavior change.** Defer it and hand off to the repository's bug-fix or behavior-change workflow; still complete any clearly separable structural operation. |
+| Tighten or loosen a shipped/public nullable annotation | **Source-contract change.** Leave the declaration and API record unchanged; hand off to the repository's API-contract workflow. |
 
-For a mixed request, perform only a clearly separable structural operation and explicitly defer the
-behavior/contract change. Never modify tests to make an unauthorized behavior change appear preserved.
+The three-line stop response applies only when the entire request is outside behavior-preserving
+refactoring. For a mixed request, perform only a clearly separable structural operation and explicitly
+defer the behavior/contract change. Never state `No files changed.` after completing that structural
+operation, and never modify tests to make an unauthorized behavior change appear preserved.
 
 ## Work only in the current repository
 
