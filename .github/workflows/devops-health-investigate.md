@@ -53,7 +53,7 @@ permissions:
 tools:
   github:
     toolsets: [repos, issues, pull_requests, actions]
-  bash: ["cat", "grep", "head", "tail", "find", "ls", "wc", "jq", "date", "sort", "diff", "git", "python", "python3", "node", "npm", "npx", "dotnet", "pwsh"]
+  bash: ["cat", "grep", "head", "tail", "find", "ls", "wc", "jq", "date", "sort", "diff", "git", "python", "python3", "node", "dotnet", "pwsh"]
   edit:
 
 safe-outputs:
@@ -78,6 +78,7 @@ safe-outputs:
 network:
   allowed:
     - defaults
+    - dotnet
 
 timeout-minutes: 60
 
@@ -197,10 +198,7 @@ When the automatic-fix gate passes:
    surface.
 3. Run the smallest targeted validation that reproduces the original failure.
 4. Run directly related format, compile, lint, and test checks.
-5. If an agentic workflow source changes, run
-   `gh aw compile <workflow-id> --strict`, include its generated lock file, and
-   inspect the lock-file diff. Do not edit generated lock files by hand.
-6. If any required validation is unavailable, fails, or does not cover the
+5. If any required validation is unavailable, fails, or does not cover the
    original failure, stop. Revert the attempted edits and report a suggested
    fix only.
 
@@ -255,11 +253,9 @@ Otherwise, call `create_pull_request` with:
 - `draft: true`;
 - a body that first reads `.github/pull_request_template.md` and preserves its
   section names and order;
-- a `## Summary` organized by clear categories so a reader can scan the change:
-  - `**Health-check correctness**`;
-  - `**Dashboard grooming**`;
-  - `**Automated remediation**`;
-  - `**Safety and limits**`;
+- a `## Summary` organized into two to four clear, finding-relevant categories
+  derived from the actual diff, such as the affected behavior, implementation,
+  and safety limits. Do not reuse categories from an unrelated pull request;
 - a `## Related issue` section with `Fixes #<issue>` when a tracking issue
   exists, otherwise `Relates to #<health_issue_number>`;
 - a `## Validation` section with exact commands, results, and live-run limits;
