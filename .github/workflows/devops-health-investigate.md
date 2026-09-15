@@ -53,7 +53,7 @@ permissions:
 tools:
   github:
     toolsets: [repos, issues, pull_requests, actions]
-  bash: ["cat", "grep", "head", "tail", "find", "ls", "wc", "jq", "date", "sort", "diff", "git", "python", "python3", "node", "dotnet", "pwsh"]
+  bash: ["cat", "grep", "head", "tail", "find", "ls", "wc", "jq", "date", "sort", "diff", "dotnet"]
   edit:
 
 safe-outputs:
@@ -140,7 +140,8 @@ Follow the playbook steps meticulously. For each piece of evidence:
 - Record the **source** (API endpoint, file path, log excerpt)
 - Note the **timestamp** of the evidence
 - Assess **relevance** to the finding
-- Read the relevant repository files and their recent Git history.
+- Read the relevant repository files and use the GitHub tools for recent commit
+  history.
 - Find the last successful run of the same workflow and compare its commit with
   the failed run.
 - Search open and closed issues and pull requests for the same failure signature.
@@ -201,6 +202,13 @@ When the automatic-fix gate passes:
 5. If any required validation is unavailable, fails, or does not cover the
    original failure, stop. Revert the attempted edits and report a suggested
    fix only.
+
+The shell allowlist permits `dotnet` as the only validation runtime. Use the
+GitHub tools, not shell Git commands, for repository history. Do not use or
+install Node.js, Python, PowerShell, `npm`, `npx`, or ordinary `gh`. The
+compiler injects narrowly scoped Git commands required to prepare the
+`create-pull-request` output. Use them only for that purpose, not for
+investigation or validation.
 
 ### Step 6: Mandatory Multi-Model Review
 

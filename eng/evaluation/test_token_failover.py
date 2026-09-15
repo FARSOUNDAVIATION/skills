@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -136,6 +137,9 @@ class TokenFailoverTests(unittest.TestCase):
         groom_frontmatter = yaml.safe_load(groom.split("---", 2)[1])
         investigate_source = workflows / "devops-health-investigate.md"
         investigate = investigate_source.read_text(encoding="utf-8")
+        investigate_lock = (
+            workflows / "devops-health-investigate.lock.yml"
+        ).read_text(encoding="utf-8")
         investigate_frontmatter = yaml.safe_load(investigate.split("---", 2)[1])
 
         self.assertIn("Optional cache keys are not missing data", health_check)
@@ -167,8 +171,35 @@ class TokenFailoverTests(unittest.TestCase):
         )
         self.assertLessEqual(create_pr["max-patch-files"], 20)
         self.assertNotIn("gh", investigate_frontmatter["tools"]["bash"])
+        self.assertNotIn("git", investigate_frontmatter["tools"]["bash"])
         self.assertNotIn("npx", investigate_frontmatter["tools"]["bash"])
         self.assertNotIn("npm", investigate_frontmatter["tools"]["bash"])
+        self.assertNotIn("node", investigate_frontmatter["tools"]["bash"])
+        self.assertNotIn("python", investigate_frontmatter["tools"]["bash"])
+        self.assertNotIn("python3", investigate_frontmatter["tools"]["bash"])
+        self.assertNotIn("pwsh", investigate_frontmatter["tools"]["bash"])
+        for blocked_tool in (
+            "shell(git:*)",
+            "shell(node)",
+            "shell(python)",
+            "shell(python3)",
+            "shell(pwsh)",
+        ):
+            self.assertNotIn(blocked_tool, investigate_lock)
+        self.assertEqual(
+            set(re.findall(r"shell\(git(?::|\s)[^)]*\)", investigate_lock)),
+            {
+                "shell(git add:*)",
+                "shell(git branch:*)",
+                "shell(git checkout:*)",
+                "shell(git commit:*)",
+                "shell(git merge:*)",
+                "shell(git rm:*)",
+                "shell(git status)",
+                "shell(git switch:*)",
+            },
+        )
+        self.assertIn("shell(dotnet:*)", investigate_lock)
         self.assertEqual(
             investigate_frontmatter["network"]["allowed"],
             ["defaults", "dotnet"],
