@@ -269,6 +269,11 @@ class TokenFailoverTests(unittest.TestCase):
             "ghcr.io/github/gh-aw-mcpg:v0.4.18":
                 "sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53",
         }
+        expected_executable_images = {
+            f"{image}@{digest}"
+            for image, digest in expected_containers.items()
+        }
+        expected_executable_images.add("ghcr.io/github/gh-aw-mcpg:v0.4.18")
         for image, digest in expected_containers.items():
             with self.subTest(image=image):
                 container = actions_lock["containers"][image]
@@ -296,21 +301,29 @@ class TokenFailoverTests(unittest.TestCase):
                     for line in lock.splitlines()
                     if not line.lstrip().startswith("#")
                 )
-                self.assertIn('"compiler_version":"v0.88.7"', lock)
-                self.assertIn(
-                    "github/gh-aw-actions/setup@"
-                    f"{setup_sha} # v0.88.7",
-                    executable_lock,
+                executable_images = set(
+                    re.findall(
+                        r"ghcr\.io/github/(?:"
+                        r"gh-aw-firewall/(?:agent|api-proxy|squid)|gh-aw-mcpg"
+                        r"):[A-Za-z0-9._-]+(?:@sha256:[0-9a-f]{64})?",
+                        executable_lock,
+                    )
                 )
-                for image, digest in expected_containers.items():
-                    self.assertIn(f"{image}@{digest}", executable_lock)
-                for old_version in (
-                    "0.27.44",
-                    "0.28.12",
-                    "v0.4.15",
-                    "v0.88.2",
-                ):
-                    self.assertNotIn(old_version, executable_lock)
+                executable_setup_actions = set(
+                    re.findall(
+                        r"github/gh-aw-actions/setup@([^\s#\"']+)",
+                        executable_lock,
+                    )
+                )
+                self.assertIn('"compiler_version":"v0.88.7"', lock)
+                self.assertEqual(
+                    executable_setup_actions,
+                    {setup_sha},
+                )
+                self.assertEqual(
+                    executable_images,
+                    expected_executable_images,
+                )
 
         investigate_lock = (
             workflows / "devops-health-investigate.lock.yml"
