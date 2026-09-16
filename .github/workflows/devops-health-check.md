@@ -514,12 +514,22 @@ safe-outputs:
                 const correlationMatch = line.match(
                   /#investigation-correlation:(hc-\d{4}-\d{2}-\d{2}-\d+-\d+)\)/
                 );
-                if (fingerprintMatch && correlationMatch) {
+                const outboxStatus = line.includes("⏳ Dispatch pending")
+                  ? "dispatching"
+                  : line.includes("🔄 Dispatched")
+                    ? "dispatched"
+                    : null;
+                if (fingerprintMatch && correlationMatch && outboxStatus) {
                   try {
-                    priorOutbox.set(
-                      decodeURIComponent(fingerprintMatch[1]),
-                      correlationMatch[1]
-                    );
+                    const fingerprint = decodeURIComponent(fingerprintMatch[1]);
+                    if (priorOutbox.has(fingerprint)) {
+                      core.setFailed("Dashboard contains duplicate outbox rows");
+                      return;
+                    }
+                    priorOutbox.set(fingerprint, {
+                      correlation: correlationMatch[1],
+                      status: outboxStatus,
+                    });
                   } catch {
                     core.setFailed("Dashboard contains an invalid outbox marker");
                     return;
@@ -654,6 +664,25 @@ safe-outputs:
                 rowByFingerprint.set(row.fingerprint, row);
                 validatedRows.push({ finding, row });
               }
+              for (const [fingerprint, prior] of priorOutbox) {
+                if (!stateFindings.has(fingerprint)) {
+                  continue;
+                }
+                const row = rowByFingerprint.get(fingerprint);
+                const allowedStatuses = prior.status === "dispatching"
+                  ? new Set(["dispatching", "done"])
+                  : new Set(["dispatched", "done"]);
+                if (
+                  !row ||
+                  row.correlation_id !== prior.correlation ||
+                  !allowedStatuses.has(row.status)
+                ) {
+                  core.setFailed(
+                    "An active persisted outbox row was omitted or changed"
+                  );
+                  return;
+                }
+              }
 
               let dispatches;
               try {
@@ -702,7 +731,7 @@ safe-outputs:
                     new RegExp(
                       `^hc-\\d{4}-\\d{2}-\\d{2}-${context.runId}-\\d+$`
                     ).test(dispatch.correlation_id) ||
-                    priorOutbox.get(dispatch.finding_id) ===
+                    priorOutbox.get(dispatch.finding_id)?.correlation ===
                       dispatch.correlation_id
                   ) ||
                   correlations.has(dispatch.correlation_id) ||
@@ -862,7 +891,10 @@ safe-outputs:
                     repo,
                     workflow_id: "devops-health-investigate.lock.yml",
                     ref: defaultBranch,
-                    inputs: dispatch,
+                    inputs: {
+                      ...dispatch,
+                      dry_run: "false",
+                    },
                   });
                 }
               }

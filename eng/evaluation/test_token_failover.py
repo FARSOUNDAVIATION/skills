@@ -431,6 +431,14 @@ class TokenFailoverTests(unittest.TestCase):
             "A dispatch item lacks a matching dispatching outbox row",
             health_lock_text,
         )
+        self.assertIn(
+            "An active persisted outbox row was omitted or changed",
+            health_lock_text,
+        )
+        self.assertIn(
+            "priorOutbox.get(dispatch.finding_id)?.correlation",
+            health_lock_text,
+        )
         self.assertIn("body: outboxBody", health_lock_text)
         self.assertIn("body: publishedBody", health_lock_text)
         self.assertLess(
@@ -809,12 +817,9 @@ class TokenFailoverTests(unittest.TestCase):
         trigger = investigate_frontmatter.get("on", investigate_frontmatter.get(True))
         dispatch_inputs = trigger["workflow_dispatch"]["inputs"]
         self.assertEqual(dispatch_inputs["dry_run"]["type"], "boolean")
-        self.assertFalse(dispatch_inputs["dry_run"]["default"])
+        self.assertTrue(dispatch_inputs["dry_run"]["default"])
         self.assertEqual(trigger["roles"], "all")
-        self.assertEqual(
-            trigger["skip-if-no-match"],
-            "is:issue is:open label:devops-health",
-        )
+        self.assertNotIn("skip-if-no-match", trigger)
 
         self.assertEqual(
             investigate_frontmatter["safe-outputs"]["staged"],
@@ -831,14 +836,26 @@ class TokenFailoverTests(unittest.TestCase):
             "create-pull-request",
             investigate_frontmatter["safe-outputs"],
         )
+        self.assertNotIn("add-comment", investigate_frontmatter["safe-outputs"])
+        publish_job = investigate_frontmatter["safe-outputs"]["jobs"][
+            "publish-investigation"
+        ]
         self.assertEqual(
-            investigate_frontmatter["safe-outputs"]["add-comment"]["target"],
-            "695",
+            publish_job["permissions"],
+            {"actions": "read", "issues": "write"},
         )
+        self.assertEqual(set(publish_job["inputs"]), {"body"})
+        self.assertIn(
+            "needs.detection.outputs.detection_success == 'true'",
+            publish_job["if"],
+        )
+        self.assertIn("inputs.dry_run != true", publish_job["if"])
         investigate_configs = generated_safe_output_configs(investigate_lock)
         self.assertEqual(len(investigate_configs), 2)
+        self.assertIn("publish-investigation", investigate_configs[0])
+        self.assertNotIn("publish-investigation", investigate_configs[1])
         for config in investigate_configs:
-            self.assertEqual(config["add_comment"]["target"], "695")
+            self.assertNotIn("add_comment", config)
             self.assertNotIn("create_report_incomplete_issue", config)
         self.assertIn(
             'GH_AW_FAILURE_REPORT_AS_ISSUE: "false"',
@@ -850,15 +867,42 @@ class TokenFailoverTests(unittest.TestCase):
             investigate_lock_text,
         )
         self.assertNotIn("GH_AW_REQUIRED_ROLES", investigate_lock_text)
-        self.assertIn("Check skip-if-no-match query", investigate_lock_text)
+        self.assertNotIn("Check skip-if-no-match query", investigate_lock_text)
+        self.assertIn(
+            "Expected publish_investigation as the only output item",
+            investigate_lock_text,
+        )
+        self.assertIn(
+            "Investigation source run failed provenance validation",
+            investigate_lock_text,
+        )
+        self.assertIn(
+            'sourceRun.data.status === "completed"',
+            investigate_lock_text,
+        )
+        self.assertIn(
+            "setTimeout(resolve, 10000)",
+            investigate_lock_text,
+        )
+        self.assertIn(
+            "Dashboard does not contain one matching active investigation row",
+            investigate_lock_text,
+        )
+        self.assertIn(
+            "github.rest.issues.createComment",
+            investigate_lock_text,
+        )
         self.assertEqual(
             investigate_frontmatter["network"]["allowed"],
             ["defaults"],
         )
         self.assertIn("This investigator is report-only", investigate)
         self.assertIn("The only allowed target is issue `695`", investigate)
-        self.assertIn("do not call `add-comment`", investigate)
-        self.assertIn("If `dry_run` is true, do not call `add-comment`", investigate)
+        self.assertIn("do not call `publish-investigation`", investigate)
+        self.assertIn(
+            "If `dry_run` is true, do not call `publish-investigation`",
+            investigate,
+        )
         self.assertIn(
             "../aw/shared/devops-health.lock.md",
             investigate_frontmatter["imports"],
