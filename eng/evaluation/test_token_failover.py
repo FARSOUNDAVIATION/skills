@@ -315,6 +315,35 @@ class TokenFailoverTests(unittest.TestCase):
             health_lock_text,
         )
         self.assertIn("parseFencedJson", health_lock_text)
+        for lock_text in (health_lock_text, groom_lock_text):
+            self.assertIn(
+                'parsed.toISOString().slice(0, 10) === value',
+                lock_text,
+            )
+        date_probe = subprocess.run(
+            [
+                "node",
+                "-e",
+                (
+                    "const validDate=value=>{"
+                    "if(typeof value!=='string'||"
+                    "!/^\\d{4}-\\d{2}-\\d{2}$/.test(value))return false;"
+                    "const parsed=new Date(`${value}T00:00:00.000Z`);"
+                    "return !Number.isNaN(parsed.valueOf())&&"
+                    "parsed.toISOString().slice(0,10)===value};"
+                    "process.stdout.write(JSON.stringify(["
+                    "validDate('2026-09-30'),validDate('2026-09-31'),"
+                    "validDate('2025-02-29'),validDate('2024-02-29')]))"
+                ),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(
+            json.loads(date_probe.stdout),
+            [True, False, False, True],
+        )
         self.assertIn('.replace(/@/g, "&#64;")', health_lock_text)
         self.assertIn(
             'const component = "[a-z0-9][a-z0-9._/()=-]*"',
