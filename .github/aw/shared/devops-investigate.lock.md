@@ -154,23 +154,38 @@ When `finding_type == "resource"`:
 All investigation results follow this template:
 
 ```markdown
-🔍 **Investigation Complete** — [Worker Run #{run_number}]({run_url})
+## 🔍 Investigation: {canonical_title derived from trusted metadata}
 
-**Root cause:** {Clear, evidence-based description of what went wrong and why.
-Include specific error messages, commit SHAs, or file paths as evidence.}
+**Finding ID:** `{finding_id}`
+**Severity:** {finding_severity}
+**Correlation:** {correlation_id}
+**Executive Summary:** {one-sentence summary of the root cause and recommended action}
 
-**Confidence:** {High|Medium|Low} — {One sentence justifying the confidence level}
+### Root Cause
+{one-paragraph description with evidence}
 
-**Blast radius:** {What else is affected by this issue. Be specific about which
-components, workflows, or metrics are impacted.}
+**Confidence:** {High|Medium|Low} — {justification}
 
-**Suggested fix:**
-1. {Most recommended action — include specific file, line, or command}
-2. {Alternative action if applicable}
-3. {Additional step if needed}
+### Blast Radius
+{what else is affected}
 
-**Related:** {List related commits (with SHA + author), PRs (with #number), or
-issues (with #number). Say "None found" if nothing is related.}
+### Suggested Fix
+1. {step 1}
+2. {step 2}
+3. {step 3, if applicable}
+
+### Remediation Status
+Report-only. {Trusted evidence, proposed change, validation plan, and owner,
+or why the available evidence cannot verify an exact fix.}
+
+### Evidence
+{key log excerpts, API responses, or code references}
+
+### Related
+{commits, PRs, issues, or "None found"}
+
+---
+<sub>🔍 [Investigation Run #{run_number}]({run_url}) · Dispatched by health check · {correlation_id}</sub>
 ```
 
 ### Confidence Level Guidelines
