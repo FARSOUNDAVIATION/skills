@@ -84,9 +84,12 @@ safe-outputs:
               const items = (output.items || []).filter(
                 item => item.type === "publish_health_dashboard"
               );
-              if (items.length !== 1) {
+              if (
+                items.length !== 1 ||
+                (output.items || []).some(item => item.type === "noop")
+              ) {
                 throw new Error(
-                  `Expected exactly one publish_health_dashboard item, found ${items.length}`
+                  "publish_health_dashboard and noop are mutually exclusive"
                 );
               }
 
@@ -99,7 +102,12 @@ safe-outputs:
                   throw new Error(`Protocol-relative links are not allowed: ${destination}`);
                 }
                 const link = new URL(destination);
-                if (link.protocol !== "https:" || link.hostname !== "github.com") {
+                if (
+                  link.protocol !== "https:" ||
+                  link.hostname !== "github.com" ||
+                  link.username ||
+                  link.password
+                ) {
                   throw new Error(`Only github.com links are allowed: ${link.href}`);
                 }
               };
@@ -587,6 +595,7 @@ safe-outputs:
                 /## 🔍 Investigation Results\s*\n([\s\S]*?)(?=\n## |\n<!-- devops-health-state:v1)/
               );
               const rowsToRestore = [];
+              const priorRowIds = new Set();
               if (priorInvestigationSection) {
                 for (const line of priorInvestigationSection[1].split("\n")) {
                   const match = line.match(
@@ -595,9 +604,21 @@ safe-outputs:
                   if (!match) {
                     continue;
                   }
+                  priorRowIds.add(match[1]);
                   const priorCorrelation = match[6].match(
                     /<!-- correlation:(hc-[1-9][0-9]*-[1-9][0-9]*) -->/
                   )?.[1];
+                  if (
+                    match[4] !== "✅ Done" &&
+                    (
+                      !priorCorrelation ||
+                      (match[6].match(/<!-- correlation:/g) || []).length !== 1
+                    )
+                  ) {
+                    throw new Error(
+                      `Prior outbox correlation is invalid for ${match[1]}`
+                    );
+                  }
                   const nextRow = tableRows.get(match[1]);
                   if (match[4] === "✅ Done") {
                     if (
@@ -608,6 +629,9 @@ safe-outputs:
                         `Active completed row changed for ${match[1]}`
                       );
                     }
+                    continue;
+                  }
+                  if (!stateFindings.has(match[1])) {
                     continue;
                   }
                   if (
@@ -622,6 +646,17 @@ safe-outputs:
                   if (!nextRow) {
                     rowsToRestore.push(line);
                   }
+                }
+              }
+              for (const [findingId, row] of tableRows) {
+                if (
+                  row.status === "⏳ Pending" &&
+                  !priorRowIds.has(findingId) &&
+                  row.correlation_id.split("-")[1] !== String(context.runId)
+                ) {
+                  throw new Error(
+                    `New row correlation does not match this run for ${findingId}`
+                  );
                 }
               }
               if (rowsToRestore.length > 0) {

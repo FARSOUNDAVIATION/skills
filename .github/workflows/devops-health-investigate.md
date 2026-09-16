@@ -102,9 +102,12 @@ safe-outputs:
               const items = (output.items || []).filter(
                 item => item.type === "publish_investigation_report"
               );
-              if (items.length !== 1) {
+              if (
+                items.length !== 1 ||
+                (output.items || []).some(item => item.type === "noop")
+              ) {
                 throw new Error(
-                  `Expected exactly one publish_investigation_report item, found ${items.length}`
+                  "publish_investigation_report and noop are mutually exclusive"
                 );
               }
 
@@ -215,7 +218,12 @@ safe-outputs:
                   throw new Error(`Protocol-relative links are not allowed: ${destination}`);
                 }
                 const link = new URL(destination);
-                if (link.protocol !== "https:" || link.hostname !== "github.com") {
+                if (
+                  link.protocol !== "https:" ||
+                  link.hostname !== "github.com" ||
+                  link.username ||
+                  link.password
+                ) {
                   throw new Error(`Only github.com links are allowed: ${link.href}`);
                 }
               };

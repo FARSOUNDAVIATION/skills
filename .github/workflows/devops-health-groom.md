@@ -72,9 +72,12 @@ safe-outputs:
               const items = (output.items || []).filter(
                 item => item.type === "publish_groomed_dashboard"
               );
-              if (items.length !== 1) {
+              if (
+                items.length !== 1 ||
+                (output.items || []).some(item => item.type === "noop")
+              ) {
                 throw new Error(
-                  `Expected exactly one publish_groomed_dashboard item, found ${items.length}`
+                  "publish_groomed_dashboard and noop are mutually exclusive"
                 );
               }
               const item = items[0];
@@ -96,14 +99,40 @@ safe-outputs:
               ) {
                 throw new Error("Investigation Results section is invalid");
               }
+              const validateLinkDestination = destination => {
+                if (destination.startsWith("#")) {
+                  return;
+                }
+                if (destination.startsWith("//")) {
+                  throw new Error(`Protocol-relative links are not allowed: ${destination}`);
+                }
+                const link = new URL(destination);
+                if (
+                  link.protocol !== "https:" ||
+                  link.hostname !== "github.com" ||
+                  link.username ||
+                  link.password
+                ) {
+                  throw new Error(`Only github.com links are allowed: ${link.href}`);
+                }
+              };
+              for (const match of section.matchAll(/https?:\/\/[^\s)<>"']+/g)) {
+                validateLinkDestination(
+                  match[0].replace(/[.,;:!?]+$/, "")
+                );
+              }
               if (/(^|[^:])\/\/[A-Za-z0-9]/m.test(section)) {
                 throw new Error("Protocol-relative links are not allowed");
               }
-              for (const match of section.matchAll(/https?:\/\/[^\s)<>"']+/g)) {
-                const link = new URL(match[0].replace(/[.,;:!?]+$/, ""));
-                if (link.protocol !== "https:" || link.hostname !== "github.com") {
-                  throw new Error(`Only github.com links are allowed: ${link.href}`);
-                }
+              for (const match of section.matchAll(
+                /!?\[[^\]\r\n]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g
+              )) {
+                validateLinkDestination(match[1]);
+              }
+              for (const match of section.matchAll(
+                /(?:href|src)\s*=\s*["']([^"']+)["']/gi
+              )) {
+                validateLinkDestination(match[1]);
               }
               const prose = section
                 .replace(/```[\s\S]*?```/g, "")
@@ -117,6 +146,8 @@ safe-outputs:
                 ...context.repo,
                 issue_number: issueNumber,
               });
+              const observedBody = issue.body || "";
+              const observedUpdatedAt = issue.updated_at;
               const labels = issue.labels.map(label =>
                 typeof label === "string" ? label : label.name
               );
@@ -436,6 +467,22 @@ safe-outputs:
               }
               if (nextBody.length > 65000) {
                 throw new Error("Groomed dashboard body exceeds 65,000 characters");
+              }
+              const { data: currentIssue } = await github.rest.issues.get({
+                ...context.repo,
+                issue_number: issueNumber,
+              });
+              const currentLabels = currentIssue.labels.map(label =>
+                typeof label === "string" ? label : label.name
+              );
+              if (
+                currentIssue.state !== "open" ||
+                currentIssue.title !== "🏥 Repository Health Dashboard" ||
+                !currentLabels.includes("devops-health") ||
+                currentIssue.updated_at !== observedUpdatedAt ||
+                (currentIssue.body || "") !== observedBody
+              ) {
+                throw new Error("Dashboard changed before groom publication");
               }
               await github.rest.issues.update({
                 ...context.repo,

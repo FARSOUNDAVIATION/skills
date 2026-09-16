@@ -134,6 +134,8 @@ def run_groom_publisher(
     *,
     prior_body: str,
     section: str,
+    include_noop: bool = False,
+    mutate_on_second_issue_get: bool = False,
 ) -> dict[str, object]:
     node = shutil.which("node")
     if not node:
@@ -143,34 +145,44 @@ def run_groom_publisher(
         temp_path = Path(temp_dir)
         output_path = temp_path / "agent-output.json"
         harness_path = temp_path / "groom-publisher-harness.cjs"
+        items = [
+            {
+                "type": "publish_groomed_dashboard",
+                "investigation_section": section,
+            }
+        ]
+        if include_noop:
+            items.append({"type": "noop", "message": "nothing to do"})
         output_path.write_text(
             json.dumps(
-                {
-                    "items": [
-                        {
-                            "type": "publish_groomed_dashboard",
-                            "investigation_section": section,
-                        }
-                    ]
-                }
+                {"items": items}
             ),
             encoding="utf-8",
         )
         harness_path.write_text(
             f"""
 const calls = [];
+let issueGetCount = 0;
+let currentBody = {json.dumps(prior_body)};
 const github = {{
   rest: {{
     issues: {{
       get: async args => {{
+        issueGetCount += 1;
+        if ({json.dumps(mutate_on_second_issue_get)} && issueGetCount === 2) {{
+          currentBody += "\\nExternal edit";
+        }}
         calls.push({{ type: "get", args }});
         return {{
           data: {{
             state: "open",
             title: "🏥 Repository Health Dashboard",
             labels: [{{ name: "devops-health" }}],
-            updated_at: "2026-09-16T10:00:00Z",
-            body: {json.dumps(prior_body)}
+            updated_at:
+              {json.dumps(mutate_on_second_issue_get)} && issueGetCount === 2
+                ? "2026-09-16T10:01:00Z"
+                : "2026-09-16T10:00:00Z",
+            body: currentBody
           }}
         }};
       }},
@@ -214,6 +226,7 @@ def run_investigation_publisher(
     report_body: str | None = None,
     dashboard_body_override: str | None = None,
     expected_severity: str = "critical",
+    include_noop: bool = False,
 ) -> dict[str, object]:
     node = shutil.which("node")
     if not node:
@@ -260,16 +273,17 @@ def run_investigation_publisher(
         temp_path = Path(temp_dir)
         output_path = temp_path / "agent-output.json"
         harness_path = temp_path / "investigation-publisher-harness.cjs"
+        items = [
+            {
+                "type": "publish_investigation_report",
+                "report_body": report_body,
+            }
+        ]
+        if include_noop:
+            items.append({"type": "noop", "message": "nothing to do"})
         output_path.write_text(
             json.dumps(
-                {
-                    "items": [
-                        {
-                            "type": "publish_investigation_report",
-                            "report_body": report_body,
-                        }
-                    ]
-                }
+                {"items": items}
             ),
             encoding="utf-8",
         )
@@ -359,6 +373,8 @@ def run_health_publisher(
     initial_body: str = "",
     complete_template: bool = True,
     mutate_on_second_issue_get: bool = False,
+    include_noop: bool = False,
+    context_run_id: int | None = None,
 ) -> dict[str, object]:
     node = shutil.which("node")
     if not node:
@@ -395,16 +411,17 @@ def run_health_publisher(
                     1,
                 )
             normalized_item["dashboard_body"] = body
+        items = [
+            {
+                "type": "publish_health_dashboard",
+                **normalized_item,
+            }
+        ]
+        if include_noop:
+            items.append({"type": "noop", "message": "nothing to do"})
         output_path.write_text(
             json.dumps(
-                {
-                    "items": [
-                        {
-                            "type": "publish_health_dashboard",
-                            **normalized_item,
-                        }
-                    ]
-                }
+                {"items": items}
             ),
             encoding="utf-8",
         )
@@ -424,6 +441,12 @@ def run_health_publisher(
         existing_comments_json = json.dumps(existing_comments or [])
         fail_comment_json = json.dumps(fail_comment)
         mutate_on_second_get_json = json.dumps(mutate_on_second_issue_get)
+        if context_run_id is None:
+            correlation = re.search(
+                r"<!-- correlation:hc-([1-9][0-9]*)-",
+                str(normalized_item["dashboard_body"]),
+            )
+            context_run_id = int(correlation.group(1)) if correlation else 1
         harness_path.write_text(
             f"""
 const calls = [];
@@ -510,7 +533,10 @@ const github = {{
     }}
   }}
 }};
-const context = {{ repo: {{ owner: "dotnet", repo: "skills" }} }};
+const context = {{
+  repo: {{ owner: "dotnet", repo: "skills" }},
+  runId: {context_run_id}
+}};
 (async () => {{
 {health_publisher_script()}
 }})()
@@ -1072,7 +1098,7 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertTrue(accepted["ok"])
         self.assertEqual(
             [call["type"] for call in accepted["calls"]],
-            ["get", "update"],
+            ["get", "get", "update"],
         )
 
         resolved_prior_body = prior_body.replace(
@@ -1103,8 +1129,43 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertTrue(retained_after_resolution["ok"])
         self.assertEqual(
             [call["type"] for call in retained_after_resolution["calls"]],
-            ["get", "update"],
+            ["get", "get", "update"],
         )
+
+        concurrent = run_groom_publisher(
+            self,
+            prior_body=prior_body,
+            section=section,
+            mutate_on_second_issue_get=True,
+        )
+        self.assertFalse(concurrent["ok"])
+        self.assertIn("Dashboard changed before groom publication", concurrent["error"])
+        self.assertNotIn(
+            "update",
+            [call["type"] for call in concurrent["calls"]],
+        )
+
+        mutually_exclusive = run_groom_publisher(
+            self,
+            prior_body=prior_body,
+            section=section,
+            include_noop=True,
+        )
+        self.assertFalse(mutually_exclusive["ok"])
+        self.assertIn("mutually exclusive", mutually_exclusive["error"])
+        self.assertEqual(mutually_exclusive["calls"], [])
+
+        unsafe_link = run_groom_publisher(
+            self,
+            prior_body=prior_body,
+            section=section.replace(
+                "⏳ Awaiting investigation result",
+                "[unsafe](javascript:alert(1))",
+            ),
+        )
+        self.assertFalse(unsafe_link["ok"])
+        self.assertIn("Only github.com links are allowed", unsafe_link["error"])
+        self.assertEqual(unsafe_link["calls"], [])
 
         invalid_state_body = prior_body.replace(
             json.dumps(
@@ -1557,11 +1618,30 @@ class TokenFailoverTests(unittest.TestCase):
             ["get"],
         )
 
+        wrong_run_correlation = run_health_publisher(
+            self,
+            {
+                "dashboard_body": body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": json.dumps([matching_dispatch]),
+            },
+            context_run_id=999,
+        )
+        self.assertFalse(wrong_run_correlation["ok"])
+        self.assertIn(
+            "New row correlation does not match this run",
+            wrong_run_correlation["error"],
+        )
+        self.assertEqual(
+            [call["type"] for call in wrong_run_correlation["calls"]],
+            ["get"],
+        )
+
         resolved_body = empty_table_body.replace(
             state_marker,
             '<!-- devops-health-state:v1\n{"active_findings":[],"history":[]}\n-->',
         )
-        preserved = run_health_publisher(
+        resolved = run_health_publisher(
             self,
             {
                 "dashboard_body": resolved_body,
@@ -1570,22 +1650,42 @@ class TokenFailoverTests(unittest.TestCase):
             },
             initial_body=body,
         )
-        self.assertTrue(preserved["ok"])
+        self.assertTrue(resolved["ok"])
         persisted_body = next(
             call["body"]
-            for call in preserved["calls"]
+            for call in resolved["calls"]
             if call["type"] == "update"
         )
-        self.assertIn("<!-- correlation:hc-101-1 -->", persisted_body)
+        self.assertNotIn("<!-- correlation:hc-101-1 -->", persisted_body)
 
-        unsafe_prior = body.replace(
+        info_finding = {
+            **finding,
+            "severity": "info",
+        }
+        active_info_state = (
+            "<!-- devops-health-state:v1\n"
+            + json.dumps(
+                {"active_findings": [info_finding], "history": []},
+                separators=(",", ":"),
+            )
+            + "\n-->"
+        )
+        active_info_body = empty_table_body.replace(
+            state_marker,
+            active_info_state,
+        )
+        unsafe_prior = body.replace('"severity":"critical"', '"severity":"info"')
+        unsafe_prior = unsafe_prior.replace(
+            "🔴 Critical",
+            "🔵 Info",
+        ).replace(
             "⏳ Awaiting investigation result",
             "[unsafe](//attacker.example/path)",
         )
         rejected_restore = run_health_publisher(
             self,
             {
-                "dashboard_body": resolved_body,
+                "dashboard_body": active_info_body,
                 "daily_comment": "## 📋 Health Check — 2026-09-16",
                 "dispatches_json": "[]",
             },
@@ -1984,6 +2084,19 @@ class TokenFailoverTests(unittest.TestCase):
             ["get", "get", "update", "repo", "comment"],
         )
 
+        mutually_exclusive = run_health_publisher(
+            self,
+            {
+                "dashboard_body": body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": "[]",
+            },
+            include_noop=True,
+        )
+        self.assertFalse(mutually_exclusive["ok"])
+        self.assertIn("mutually exclusive", mutually_exclusive["error"])
+        self.assertEqual(mutually_exclusive["calls"], [])
+
         concurrent = run_health_publisher(
             self,
             {
@@ -2021,6 +2134,21 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertFalse(unsafe["ok"])
         self.assertIn("Protocol-relative links are not allowed", unsafe["error"])
         self.assertEqual(unsafe["calls"], [])
+
+        userinfo = run_health_publisher(
+            self,
+            {
+                "dashboard_body": body.replace(
+                    "`owner/action@v1` should use a commit SHA.",
+                    "[details](https://user:pass@github.com/dotnet/skills)",
+                ),
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": "[]",
+            },
+        )
+        self.assertFalse(userinfo["ok"])
+        self.assertIn("Only github.com links are allowed", userinfo["error"])
+        self.assertEqual(userinfo["calls"], [])
 
     def test_devops_health_investigation_is_report_only(self) -> None:
         investigate_source = (
@@ -2132,6 +2260,14 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("github-actions[bot] provenance", manual["error"])
         self.assertEqual(manual["calls"], [])
 
+        mutually_exclusive = run_investigation_publisher(
+            self,
+            include_noop=True,
+        )
+        self.assertFalse(mutually_exclusive["ok"])
+        self.assertIn("mutually exclusive", mutually_exclusive["error"])
+        self.assertEqual(mutually_exclusive["calls"], [])
+
         incomplete = run_investigation_publisher(
             self,
             report_body=(
@@ -2170,6 +2306,21 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Protocol-relative links are not allowed", unsafe["error"])
         self.assertEqual(
             [call["type"] for call in unsafe["calls"]],
+            ["get-run"],
+        )
+
+        userinfo_report = unsafe_report.replace(
+            "[details](//attacker.example/path)",
+            "[details](https://user:pass@github.com/dotnet/skills)",
+        )
+        userinfo = run_investigation_publisher(
+            self,
+            report_body=userinfo_report,
+        )
+        self.assertFalse(userinfo["ok"])
+        self.assertIn("Only github.com links are allowed", userinfo["error"])
+        self.assertEqual(
+            [call["type"] for call in userinfo["calls"]],
             ["get-run"],
         )
 
