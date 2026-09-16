@@ -139,6 +139,88 @@ safe-outputs:
 
               const islandPattern =
                 /(^|\n)## 🔍 Investigation Results\n[\s\S]*?(?=\n## |\n<!-- devops-health-state:v1|$)/;
+              const parseRows = value => {
+                const rows = new Map();
+                for (const line of value.split("\n")) {
+                  const match = line.match(
+                    /^\| `([^`]+)` \| ([^|]*) \| ([^|]*) \| (⏳ Pending|🔄 Dispatched|✅ Done) \| ([^|]*) \| (.*) \|$/
+                  );
+                  if (!match) {
+                    continue;
+                  }
+                  if (rows.has(match[1])) {
+                    throw new Error(`Duplicate Investigation Results row for ${match[1]}`);
+                  }
+                  rows.set(match[1], {
+                    status: match[4],
+                    result: match[6],
+                    correlation: match[6].match(
+                      /<!-- correlation:(hc-[1-9][0-9]*-[1-9][0-9]*) -->/
+                    )?.[1],
+                  });
+                }
+                return rows;
+              };
+              const stateMatches = [
+                ...(issue.body || "").matchAll(
+                  /<!-- devops-health-state:v1\s*\n([\s\S]*?)\n-->/g
+                ),
+              ];
+              let activeIds = null;
+              if (stateMatches.length > 1) {
+                throw new Error("Dashboard state marker is duplicated");
+              }
+              if (stateMatches.length === 1) {
+                let state;
+                try {
+                  state = JSON.parse(stateMatches[0][1]);
+                } catch (error) {
+                  throw new Error(`Dashboard state JSON is invalid: ${error.message}`);
+                }
+                if (!Array.isArray(state.active_findings)) {
+                  throw new Error("Dashboard active findings are invalid");
+                }
+                activeIds = new Set(
+                  state.active_findings.map(finding => finding?.fingerprint)
+                );
+                if (activeIds.has(undefined) || activeIds.size !== state.active_findings.length) {
+                  throw new Error("Dashboard active finding IDs are invalid");
+                }
+              }
+              const newRows = parseRows(section);
+              const priorIsland = (issue.body || "").match(islandPattern)?.[0] || "";
+              const priorRows = parseRows(priorIsland);
+              for (const [findingId, priorRow] of priorRows) {
+                const mustPreserve = activeIds === null || activeIds.has(findingId);
+                if (!mustPreserve) {
+                  continue;
+                }
+                const nextRow = newRows.get(findingId);
+                if (
+                  !nextRow ||
+                  (
+                    priorRow.correlation &&
+                    nextRow.correlation !== priorRow.correlation
+                  ) ||
+                  (
+                    priorRow.status === "✅ Done" &&
+                    (
+                      nextRow.status !== "✅ Done" ||
+                      nextRow.result !== priorRow.result
+                    )
+                  )
+                ) {
+                  throw new Error(
+                    `Active Investigation Results row was not preserved for ${findingId}`
+                  );
+                }
+              }
+              if (
+                activeIds !== null &&
+                [...newRows.keys()].some(findingId => !activeIds.has(findingId))
+              ) {
+                throw new Error("Investigation Results contains a non-active finding");
+              }
               let nextBody;
               if (islandPattern.test(issue.body || "")) {
                 nextBody = (issue.body || "").replace(

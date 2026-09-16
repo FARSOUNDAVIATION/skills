@@ -116,6 +116,98 @@ def investigation_publisher_script() -> str:
     )
 
 
+def groom_publisher_script() -> str:
+    source = (
+        REPO_ROOT / ".github" / "workflows" / "devops-health-groom.md"
+    ).read_text(encoding="utf-8")
+    frontmatter = yaml.safe_load(source.split("---", 2)[1])
+    publisher = frontmatter["safe-outputs"]["jobs"]["publish-groomed-dashboard"]
+    return next(
+        step["with"]["script"]
+        for step in publisher["steps"]
+        if step.get("name") == "Verify and publish groomed dashboard"
+    )
+
+
+def run_groom_publisher(
+    test_case: unittest.TestCase,
+    *,
+    prior_body: str,
+    section: str,
+) -> dict[str, object]:
+    node = shutil.which("node")
+    if not node:
+        test_case.skipTest("Node.js is required for publisher behavior tests")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        output_path = temp_path / "agent-output.json"
+        harness_path = temp_path / "groom-publisher-harness.cjs"
+        output_path.write_text(
+            json.dumps(
+                {
+                    "items": [
+                        {
+                            "type": "publish_groomed_dashboard",
+                            "expected_updated_at": "2026-09-16T10:00:00Z",
+                            "investigation_section": section,
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        harness_path.write_text(
+            f"""
+const calls = [];
+const github = {{
+  rest: {{
+    issues: {{
+      get: async args => {{
+        calls.push({{ type: "get", args }});
+        return {{
+          data: {{
+            state: "open",
+            title: "🏥 Repository Health Dashboard",
+            labels: [{{ name: "devops-health" }}],
+            updated_at: "2026-09-16T10:00:00Z",
+            body: {json.dumps(prior_body)}
+          }}
+        }};
+      }},
+      update: async args => {{
+        calls.push({{ type: "update", body: args.body }});
+        return {{ data: {{}} }};
+      }}
+    }}
+  }}
+}};
+const context = {{ repo: {{ owner: "dotnet", repo: "skills" }} }};
+(async () => {{
+{groom_publisher_script()}
+}})()
+  .then(() => console.log(JSON.stringify({{ ok: true, calls }})))
+  .catch(error => console.log(JSON.stringify({{
+    ok: false,
+    error: error.message,
+    calls
+  }})));
+""",
+            encoding="utf-8",
+        )
+        environment = os.environ.copy()
+        environment["GH_AW_AGENT_OUTPUT"] = str(output_path)
+        completed = subprocess.run(
+            [node, str(harness_path)],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=environment,
+        )
+        return json.loads(completed.stdout.strip())
+
+
 def run_investigation_publisher(
     test_case: unittest.TestCase,
     *,
@@ -690,6 +782,10 @@ class TokenFailoverTests(unittest.TestCase):
             "Dashboard identity or version validation failed",
             groom_script,
         )
+        self.assertIn(
+            "Active Investigation Results row was not preserved",
+            groom_script,
+        )
         groom_manifest = json.loads(
             groom_lock_text.splitlines()[1].removeprefix("# gh-aw-manifest: ")
         )
@@ -880,6 +976,58 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn(
             "correlate and de-duplicate exclusively by this ID",
             " ".join(shared_health.split()),
+        )
+
+    def test_devops_health_groom_publisher_preserves_active_rows(self) -> None:
+        finding_id = "pipeline:evaluation:evaluate:test:failure"
+        correlation = "hc-500-1"
+        row = (
+            f"| `{finding_id}` | Evaluation tests failed | 🔴 Critical | "
+            "⏳ Pending | 2026-09-16 | ⏳ Awaiting investigation result "
+            f"<!-- correlation:{correlation} --> |"
+        )
+        section = f"""## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+{row}"""
+        prior_body = f"""# 🏥 Daily Health Check — 2026-09-16
+
+{section}
+
+<!-- devops-health-state:v1
+{json.dumps({"active_findings": [{"fingerprint": finding_id}], "history": []}, separators=(",", ":"))}
+-->
+"""
+        empty_section = """## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|"""
+
+        rejected = run_groom_publisher(
+            self,
+            prior_body=prior_body,
+            section=empty_section,
+        )
+        self.assertFalse(rejected["ok"])
+        self.assertIn(
+            "Active Investigation Results row was not preserved",
+            rejected["error"],
+        )
+        self.assertEqual(
+            [call["type"] for call in rejected["calls"]],
+            ["get"],
+        )
+
+        accepted = run_groom_publisher(
+            self,
+            prior_body=prior_body,
+            section=section,
+        )
+        self.assertTrue(accepted["ok"])
+        self.assertEqual(
+            [call["type"] for call in accepted["calls"]],
+            ["get", "update"],
         )
 
     def test_devops_health_publisher_rejects_invalid_state(self) -> None:
