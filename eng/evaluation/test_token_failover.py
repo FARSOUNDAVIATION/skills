@@ -245,6 +245,20 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Bind outputs to verified data", normalized_groom)
         self.assertIn("/issues/695", groom)
         self.assertIn("issue_number: 695", groom)
+        self.assertIn("perPage: 20, page: 1", groom)
+        self.assertIn("Continue with page 2", groom)
+        self.assertIn("GitHub returns issue comments oldest first", groom)
+        self.assertIn(
+            "until a response contains neither comments nor a `[Filtered]` notice",
+            normalized_groom,
+        )
+        self.assertIn("do not stop based on comment age", normalized_groom)
+        self.assertIn("Integrity filtering can remove items", groom)
+        self.assertIn(
+            "include only fetched comments whose `created_at` is within the last 30 days",
+            normalized_groom,
+        )
+        self.assertIn("Do not stop after the first page", normalized_groom)
         self.assertIn("Do not finish with only a text response", groom)
 
         self.assertFalse(health_frontmatter["tools"]["bash"])

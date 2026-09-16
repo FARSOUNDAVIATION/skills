@@ -98,13 +98,19 @@ verification fails, call `noop` and stop.
 ## Step 2: Fetch Recent Comments
 
 Use the GitHub MCP `issue_read` tool with `method: get_comments` to fetch comments
-on the verified health dashboard issue. The MCP tool returns the most recent
-comments; focus on investigation comments from the last 30 days.
+on the verified health dashboard issue. Request 20 comments per page, starting
+with page 1:
 
 ```
-issue_read(method: "get_comments", owner: "{owner}", repo: "{repo}", issue_number: 695)
+issue_read(method: "get_comments", owner: "{owner}", repo: "{repo}", issue_number: 695, perPage: 20, page: 1)
 ```
-Use only the same verified issue number from Step 1.
+Use only the same verified issue number from Step 1. Continue with page 2, page
+3, and so on until a response contains neither comments nor a `[Filtered]`
+notice. GitHub returns issue comments oldest first, so do not stop based on
+comment age or a short visible page. Integrity filtering can remove items from
+an otherwise full page. After reaching the empty page, include only fetched
+comments whose `created_at` is within the last 30 days. Do not stop after the
+first page.
 
 If the response includes a `[Filtered]` notice (e.g. "N item(s) in this response were removed by integrity policy"), **continue working with the comments that were returned**. The filtered items are from non-bot authors whose comments the groomer does not process anyway. Do NOT call `report_incomplete` or `missing_tool` because of filtered items — proceed with the available data.
 
