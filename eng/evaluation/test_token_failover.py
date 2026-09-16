@@ -194,7 +194,7 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Missing prior state is not missing data", health_check)
         self.assertIn("Do not call `missing-data`", health_check)
         self.assertIn(
-            "If `update-issue`, `add-comment`, or `dispatch-workflow`",
+            "If `publish-health-report` was emitted",
             health_check,
         )
         self.assertNotIn("create-issue", health_frontmatter["safe-outputs"])
@@ -204,11 +204,31 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertFalse(
             health_frontmatter["safe-outputs"]["report-incomplete"]
         )
-        for output in ("update-issue", "add-comment"):
-            self.assertEqual(
-                health_frontmatter["safe-outputs"][output]["target"],
-                "695",
-            )
+        self.assertNotIn("update-issue", health_frontmatter["safe-outputs"])
+        self.assertNotIn("add-comment", health_frontmatter["safe-outputs"])
+        self.assertNotIn("dispatch-workflow", health_frontmatter["safe-outputs"])
+        publish_job = health_frontmatter["safe-outputs"]["jobs"][
+            "publish-health-report"
+        ]
+        self.assertEqual(
+            publish_job["permissions"],
+            {"actions": "write", "contents": "read", "issues": "write"},
+        )
+        self.assertEqual(
+            set(publish_job["inputs"]),
+            {
+                "body",
+                "comment_body",
+                "dispatches_json",
+                "investigation_rows_json",
+                "state_json",
+            },
+        )
+        self.assertIn(
+            "needs.detection.outputs.detection_success == 'true'",
+            publish_job["if"],
+        )
+        self.assertEqual(health_check.count("## 📋 Health Check — "), 2)
         self.assertIn("as untrusted data", health_check)
         self.assertIn("Validate every target", health_check)
         self.assertIn(
@@ -216,21 +236,163 @@ class TokenFailoverTests(unittest.TestCase):
             "`devops-health` label",
             normalized_health,
         )
-        self.assertIn('health_issue_number: "695"', health_check)
-        self.assertEqual(
-            health_frontmatter["safe-outputs"]["dispatch-workflow"]["max"],
-            2,
-        )
+        self.assertIn('"health_issue_number": "695"', health_check)
         health_configs = generated_safe_output_configs(health_lock)
         self.assertEqual(len(health_configs), 2)
+        self.assertIn("publish-health-report", health_configs[0])
+        self.assertNotIn("publish-health-report", health_configs[1])
         for config in health_configs:
-            self.assertEqual(config["dispatch_workflow"]["max"], 2)
-            self.assertEqual(config["update_issue"]["target"], "695")
-            self.assertEqual(config["add_comment"]["target"], "695")
+            self.assertNotIn("dispatch_workflow", config)
+            self.assertNotIn("update_issue", config)
+            self.assertNotIn("add_comment", config)
             self.assertNotIn("create_issue", config)
             self.assertNotIn("create_report_incomplete_issue", config)
         self.assertIn(
-            "dispatch-workflow [devops_health_investigate](max:2 total)",
+            '"tools":["missing_data","missing_tool","noop","publish_health_report"]',
+            health_lock_text,
+        )
+        update_index = health_lock_text.index(
+            "await github.rest.issues.update"
+        )
+        comment_index = health_lock_text.index(
+            "await github.rest.issues.createComment"
+        )
+        dispatch_index = health_lock_text.index(
+            "await github.rest.actions.createWorkflowDispatch"
+        )
+        self.assertLess(update_index, comment_index)
+        self.assertLess(update_index, dispatch_index)
+        self.assertIn(
+            'workflow_id: "devops-health-investigate.lock.yml"',
+            health_lock_text,
+        )
+        self.assertIn(
+            'dashboard.data.title !== "🏥 Repository Health Dashboard"',
+            health_lock_text,
+        )
+        self.assertIn(
+            'dashboard.data.state !== "open"',
+            health_lock_text,
+        )
+        self.assertIn(
+            '!labels.includes("devops-health")',
+            health_lock_text,
+        )
+        self.assertIn(
+            "dispatches.length > 2",
+            health_lock_text,
+        )
+        publish_condition = health_lock["jobs"]["publish_health_report"]["if"]
+        self.assertIn(
+            "needs.detection.result == 'success'",
+            publish_condition,
+        )
+        self.assertIn(
+            "needs.detection.outputs.detection_success == 'true'",
+            publish_condition,
+        )
+        self.assertIn(
+            "Dashboard body is missing required publication placeholders",
+            health_lock_text,
+        )
+        self.assertIn(
+            "must be one exact fenced JSON block",
+            health_lock_text,
+        )
+        self.assertIn("parseFencedJson", health_lock_text)
+        self.assertIn('.replace(/@/g, "&#64;")', health_lock_text)
+        self.assertIn(
+            'const component = "[a-z0-9][a-z0-9._/()=-]*"',
+            health_lock_text,
+        )
+        component = re.search(
+            r'const component = "([^"]+)"',
+            health_check,
+        )
+        self.assertIsNotNone(component)
+        production_fingerprint = (
+            "pipeline:evaluation:evaluate-/-vally-"
+            "(dotnet-blazor--claude-opus-5):"
+            "run-vally-evaluations:failure"
+        )
+        self.assertRegex(
+            production_fingerprint,
+            re.compile(
+                rf"^pipeline:{component.group(1)}:{component.group(1)}:"
+                rf"{component.group(1)}:{component.group(1)}$"
+            ),
+        )
+        self.assertIn(
+            "investigation_rows_json must contain at most 100 rows",
+            health_lock_text,
+        )
+        self.assertIn(
+            "investigation-fingerprint:${finding.fingerprint}",
+            health_lock_text,
+        )
+        self.assertIn(
+            "devops-health-state:v1",
+            health_lock_text,
+        )
+        self.assertIn(
+            "expectedSeverityForFingerprint",
+            health_lock_text,
+        )
+        self.assertIn(
+            "${context.runId}-\\\\d+$",
+            health_lock_text,
+        )
+        self.assertIn(
+            "Dashboard state contains an invalid active finding",
+            health_lock_text,
+        )
+        self.assertIn(
+            "A dispatch item does not match persisted dashboard state",
+            health_lock_text,
+        )
+        self.assertIn(
+            "Dashboard state contains a reserved delimiter or publication sentinel",
+            health_lock_text,
+        )
+        self.assertIn(
+            ".replace(rowsToken, () => renderedRows.join",
+            health_lock_text,
+        )
+        self.assertIn(
+            ".replace(stateToken, () => stateMarker)",
+            health_lock_text,
+        )
+        self.assertLess(
+            health_lock_text.index(".replace(stateToken, () => stateMarker)"),
+            health_lock_text.index(
+                ".replace(rowsToken, () => renderedRows.join"
+            ),
+        )
+        self.assertIn(
+            "A dispatch item lacks a persisted dispatched investigation row",
+            health_lock_text,
+        )
+        self.assertIn(
+            ".replace(/\\r\\n|\\r|\\n/g, \" \")",
+            health_lock_text,
+        )
+        self.assertIn(
+            "devops-health-publication:${context.runId}",
+            health_lock_text,
+        )
+        self.assertIn(
+            "run.display_title === expectedRunName",
+            health_lock_text,
+        )
+        self.assertIn(
+            "hc-{date}-{current_health_run_id}-{sequence}",
+            health_check,
+        )
+        publication_script = health_lock_text[update_index:dispatch_index]
+        self.assertNotIn("catch", publication_script)
+        self.assertNotIn("try", publication_script)
+        self.assertIn(
+            "Any failure throws and stops",
             health_lock_text,
         )
         self.assertFalse(groom_frontmatter["tools"]["cli-proxy"])
@@ -279,10 +441,15 @@ class TokenFailoverTests(unittest.TestCase):
             normalized_groom,
         )
         self.assertIn(
-            "matches an active fingerprint or the hidden",
+            "matches an active fingerprint or the invisible",
             normalized_groom,
         )
         self.assertIn("investigation-fingerprint:{fingerprint}", groom)
+        self.assertIn(
+            "invisible same-repository link marker",
+            normalized_groom,
+        )
+        self.assertNotIn("<!-- investigation-fingerprint", groom)
         self.assertIn(
             "`severity` from the `**Severity:** {severity}` line",
             groom,
@@ -306,11 +473,20 @@ class TokenFailoverTests(unittest.TestCase):
             normalized_groom,
         )
         self.assertIn(
-            "De-duplicate by the hidden fingerprint marker",
+            "De-duplicate by the invisible fingerprint link marker",
             normalized_groom,
         )
         self.assertIn(
-            "| <!-- investigation-fingerprint:{finding_id} -->",
+            "Never join a normal investigation comment to a row by title",
+            normalized_groom,
+        )
+        self.assertIn(
+            "require its exact title to match exactly one active finding in validated state",
+            normalized_groom,
+        )
+        self.assertIn(
+            "| [](https://github.com/{owner}/{repo}/issues/695"
+            "#investigation-fingerprint:{finding_id})",
             groom,
         )
         self.assertIn("Do not stop after the first page", normalized_groom)
@@ -372,6 +548,17 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("unavailable_scopes", shared_health)
         self.assertIn("carry_forward_unchanged", shared_health)
         self.assertIn("do not increment their occurrences", shared_health)
+        self.assertIn(
+            "`state_json` field of the single\n`publish-health-report` request",
+            shared_health,
+        )
+        self.assertNotIn(
+            "replacement body emitted through `update-issue`",
+            shared_health,
+        )
+        self.assertNotIn("Space dispatches 5 seconds apart", shared_health)
+        self.assertNotIn("<!-- investigation:{fingerprint} -->", shared_health)
+        self.assertIn("### 6.5 Investigation Row Identity", shared_health)
         for scope_mapping in (
             "`pipeline:{workflow}:{job}:timeout` | P2",
             "`pipeline:evaluation:failure-rate:{bucket}` | P5",
@@ -395,9 +582,10 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertNotIn("GET /repos/{owner}/{repo}/pages", health_check)
         self.assertIn("Pending — dispatch budget reached", health_check)
         self.assertIn("Dispatch retry", health_check)
-        self.assertIn("investigation-fingerprint:{fingerprint}", health_check)
-        self.assertIn("update its existing Pending row in place", health_check)
-        self.assertIn("Never retain both Pending and Dispatched rows", health_check)
+        self.assertIn("DEVOPS_HEALTH_INVESTIGATION_ROWS_SLOT_V1", health_check)
+        self.assertIn("DEVOPS_HEALTH_STATE_SLOT_V1", health_check)
+        self.assertIn("replace the pending", health_check)
+        self.assertIn("do not append a second row", health_check)
         self.assertIn(
             "each qualifying 📌 EXISTING pending retry",
             normalized_health,
@@ -409,9 +597,20 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Preserve the previous issue body", health_check)
         self.assertIn("fingerprint to be at most 300 characters", normalized_health)
         self.assertIn("URL at most 500 characters", normalized_health)
-        self.assertIn("complete body to be at most 60,000 characters", normalized_health)
         self.assertIn(
-            "Do not emit `update-issue`, `add-comment`, or `dispatch-workflow`",
+            "complete rendered body to be at most 60,000 characters",
+            normalized_health,
+        )
+        self.assertIn(
+            "Do not emit `publish-health-report` before this check succeeds",
+            normalized_health,
+        )
+        self.assertIn(
+            "persists the dashboard body first",
+            normalized_health,
+        )
+        self.assertIn(
+            "only after that update succeeds",
             normalized_health,
         )
         self.assertIn(
@@ -460,6 +659,11 @@ class TokenFailoverTests(unittest.TestCase):
         dispatch_inputs = trigger["workflow_dispatch"]["inputs"]
         self.assertEqual(dispatch_inputs["dry_run"]["type"], "boolean")
         self.assertFalse(dispatch_inputs["dry_run"]["default"])
+        self.assertEqual(trigger["roles"], "all")
+        self.assertEqual(
+            trigger["skip-if-no-match"],
+            "is:issue is:open label:devops-health",
+        )
 
         self.assertEqual(
             investigate_frontmatter["safe-outputs"]["staged"],
@@ -494,6 +698,8 @@ class TokenFailoverTests(unittest.TestCase):
             "GH_AW_REPORT_INCOMPLETE_CREATE_ISSUE",
             investigate_lock_text,
         )
+        self.assertNotIn("GH_AW_REQUIRED_ROLES", investigate_lock_text)
+        self.assertIn("Check skip-if-no-match query", investigate_lock_text)
         self.assertEqual(
             investigate_frontmatter["network"]["allowed"],
             ["defaults"],
@@ -502,6 +708,26 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("The only allowed target is issue `695`", investigate)
         self.assertIn("do not call `add-comment`", investigate)
         self.assertIn("If `dry_run` is true, do not call `add-comment`", investigate)
+        self.assertIn(
+            "../aw/shared/devops-health.lock.md",
+            investigate_frontmatter["imports"],
+        )
+        self.assertIn(
+            "{{#runtime-import .github/aw/shared/devops-health.lock.md}}",
+            investigate_lock_text,
+        )
+        self.assertEqual(
+            investigate_frontmatter["run-name"],
+            "DevOps Health Investigation — ${{ inputs.correlation_id }}",
+        )
+        self.assertIn(
+            "run-name: DevOps Health Investigation — ${{ inputs.correlation_id }}",
+            investigate_lock_text,
+        )
+        self.assertIn(
+            "hc-{YYYY-MM-DD}-{numeric_health_run_id}-{numeric_sequence}",
+            investigate,
+        )
 
     def test_devops_health_investigator_has_no_mutating_tools(self) -> None:
         workflows = REPO_ROOT / ".github" / "workflows"

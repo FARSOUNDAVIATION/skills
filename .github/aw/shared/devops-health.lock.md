@@ -283,8 +283,9 @@ investigation dispatch:
 
 **Budget cap:** Maximum 2 dispatches per run.
 For every qualifying finding not selected because of the cap, add or preserve
-one Investigation Results row keyed by
-`<!-- investigation-fingerprint:{fingerprint} -->` with
+one Investigation Results row keyed by the invisible same-repository link
+`[](https://github.com/{owner}/{repo}/issues/695#investigation-fingerprint:{fingerprint})`
+with
 `⏳ Pending — dispatch budget reached`. Retry that active finding on later runs
 until it is dispatched. Change that same row to `🔄 Dispatched` when selected;
 never append a second row for the same fingerprint.
@@ -329,13 +330,14 @@ If the validated dashboard body has no valid previous state:
 | Δ negative and bad (e.g., success rate down) | ⚠️ | Degrading |
 | Δ ≈ 0 | ➡️ | Stable |
 
-### 6.5 Investigation Island Template
+### 6.5 Investigation Row Identity
 
 ```markdown
-<!-- investigation:{fingerprint} -->
-⏳ Investigation dispatched — results arriving shortly...
-<!-- /investigation:{fingerprint} -->
+[](https://github.com/{owner}/{repo}/issues/695#investigation-fingerprint:{fingerprint})
 ```
+
+Use this invisible same-repository link at the start of the Finding cell.
+Do not create per-finding islands or HTML-comment row markers.
 
 ---
 
@@ -344,24 +346,26 @@ If the validated dashboard body has no valid previous state:
 ### 7.1 API Rate Limits
 - Use targeted, date-filtered queries to minimize API calls
 - The `github` MCP toolset handles pagination automatically
-- Space dispatches 5 seconds apart
+- Include at most two dispatch inputs in the single publication request
 
 ### 7.2 Issue Body Size
 - GitHub issues have a ~65,535 character limit
 - If body exceeds 60k: truncate EXISTING section (keep top 20 by severity)
 - Footer: `> … N additional existing findings omitted`
 - The daily comment always includes complete summary counts
-- Validate the complete body, including the state marker, before any safe
-  output. If visible-section reduction cannot bring it to 60,000 characters or
-  fewer, emit only `noop`.
+- Validate the complete visible body, state JSON, and structured investigation
+  rows before any safe output. If the privileged renderer cannot keep the final
+  body at 60,000 characters or fewer, emit only `noop`.
 
 ### 7.3 Dashboard State
 
 Issue `695` is both the human-readable dashboard and the bounded persistence
 surface. Read its previous state only after validating the issue identity. Write
-the next state only inside the replacement body emitted through `update-issue`.
-Do not use files, caches, shell commands, repository edits, or any other storage
-surface.
+the next state only through the fenced `state_json` field of the single
+`publish-health-report` request. The privileged publication job validates the
+state and renders its HTML marker after gh-aw sanitizes the visible Markdown.
+The fence preserves the JSON as a code region during sanitization. Do not use
+files, caches, shell commands, repository edits, or any other storage surface.
 
 ### 7.4 Graceful Degradation
 

@@ -6,6 +6,7 @@ description: >
   Dispatched by the health check orchestrator. It reports evidence,
   root cause, blast radius, and a proposed remediation without modifying
   repository files or executing repository code.
+run-name: "DevOps Health Investigation — ${{ inputs.correlation_id }}"
 
 on:
   permissions: {}
@@ -37,6 +38,8 @@ on:
         required: false
         type: boolean
         default: false
+  roles: all
+  skip-if-no-match: "is:issue is:open label:devops-health"
 
 concurrency:
   group: gh-aw-${{ github.workflow }}-${{ inputs.finding_id }}
@@ -84,6 +87,7 @@ imports:
   - uses: shared/pat_pool.md
     with:
       environment: copilot-pat-pool
+  - ../aw/shared/devops-health.lock.md
   - ../aw/shared/devops-investigate.lock.md
 
 environment: copilot-pat-pool
@@ -135,6 +139,8 @@ any resource, enforce all of these rules:
    pull request, issue, blob, tree, or repository-root URL that is relevant to
    the finding fingerprint. Do not fetch a resource merely because an input
    points to it.
+7. `correlation_id` matches
+   `hc-{YYYY-MM-DD}-{numeric_health_run_id}-{numeric_sequence}`.
 
 After the structural checks, fetch only the trusted GitHub metadata or
 repository configuration needed to recompute the finding. Do not fetch

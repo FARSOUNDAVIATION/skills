@@ -129,9 +129,11 @@ Worker Run URL as one logical row. Rows with conflicting fingerprints or URLs
 remain distinct and ambiguous.
 
 Retain an Investigation comment regardless of age when its exact `finding_id`
-matches an active fingerprint or the hidden
-`<!-- investigation-fingerprint:{fingerprint} -->` marker in an Investigation
-Results row. Retain a Legacy investigation comment regardless of age only when
+matches an active fingerprint or the invisible same-repository link marker
+`[](https://github.com/{owner}/{repo}/issues/695#investigation-fingerprint:{fingerprint})`
+in an Investigation Results row. Accept the old HTML-comment marker only as a
+bounded migration and rewrite it as the link marker. Retain a Legacy
+investigation comment regardless of age only when
 its exact Worker Run URL occurs in exactly one Investigation Results row.
 Apply the 30-day limit only to unrelated comments. This allows delayed results
 and recovery after a long groomer outage without scanning old unrelated
@@ -193,7 +195,7 @@ and rows like:
 | {finding_title} | {severity} | 🔄 Dispatched | {date} | ⏳ Investigation dispatched — results arriving shortly... |
 ```
 
-**Duplicate section handling:** If the issue body contains **multiple** `## 🔍 Investigation Results` sections, merge all rows from every occurrence into a single table. De-duplicate by the hidden fingerprint marker. Use exact finding title only for a legacy row without a marker, and add the marker after a unique match. The `replace-island` operation only replaces the **first** occurrence — it does NOT automatically remove later duplicates. If duplicates exist, extract all rows first, then the single `replace-island` call will place them in the first section. Any remaining duplicate sections will be overwritten by the next health-check run (which replaces the entire issue body).
+**Duplicate section handling:** If the issue body contains **multiple** `## 🔍 Investigation Results` sections, merge all rows from every occurrence into a single table. De-duplicate by the invisible fingerprint link marker. Never join a normal investigation comment to a row by title. For the bounded migration of a legacy row without a marker, require its exact title to match exactly one active finding in validated state, then add that finding's link marker. The `replace-island` operation only replaces the **first** occurrence — it does NOT automatically remove later duplicates. If duplicates exist, extract all rows first, then the single `replace-island` call will place them in the first section. Any remaining duplicate sections will be overwritten by the next health-check run (which replaces the entire issue body).
 
 **If the section is missing** (the health check agent sometimes omits it), you MUST
 create it. Do NOT skip this step — creating the section is the primary purpose of
@@ -205,8 +207,12 @@ this workflow. Proceed to Step 3.2 with an empty table.
 
 For each row in the existing Investigation Results table:
 1. Determine the `finding_id` from the row's exact
-   `<!-- investigation-fingerprint:{fingerprint} -->` marker. For a legacy row
-   without a marker, match once by exact finding title and add the marker.
+   same-repository `#investigation-fingerprint:{fingerprint}` link marker.
+   Accept an old HTML-comment marker as a bounded migration and rewrite it as
+   the link marker. For a legacy row without either marker, require its exact
+   title to match exactly one active finding in validated state and add that
+   finding's link marker. Do not use title matching when joining normal
+   investigation comments.
 2. Look up the `finding_id` in the investigation comments collected in Step 2.
    For a legacy comment without `finding_id`, use only the unique exact Worker
    Run URL match defined in Step 2.1.
@@ -223,7 +229,7 @@ comments collected in Step 2:
 
 1. For each investigation comment, create a table row:
    ```
-   | <!-- investigation-fingerprint:{finding_id} --> {finding_title from comment heading} | {severity from comment} | ✅ Done | {first_seen date from Existing/New Findings section, or comment created_at date} | [{executive_summary}]({comment_url}) |
+   | [](https://github.com/{owner}/{repo}/issues/695#investigation-fingerprint:{finding_id}) {finding_title from comment heading} | {severity from comment} | ✅ Done | {first_seen date from Existing/New Findings section, or comment created_at date} | [{executive_summary}]({comment_url}) |
    ```
 2. Wrap the rows in the standard section structure:
    ```markdown

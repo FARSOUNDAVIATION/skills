@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"eb20f1ed5949e6c8a68ca43f060bbd424375f80e5c1acc86ec36216763332d08","body_hash":"42681de3dc2568d376bbd8c3f9e6450df2728855c771587c3c641260caa7337e","compiler_version":"v0.88.7","strict":true,"agent_id":"copilot","agent_model":"${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'gpt-5.6-sol' }}","engine_versions":{"copilot":"1.0.80"}}
-# gh-aw-manifest: {"version":1,"secrets":["COPILOT_PAT_0","COPILOT_PAT_1","COPILOT_PAT_2","COPILOT_PAT_3","COPILOT_PAT_4","COPILOT_PAT_5","COPILOT_PAT_6","COPILOT_PAT_7","COPILOT_PAT_8","COPILOT_PAT_9","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"},{"repo":"github/gh-aw-actions/setup","sha":"5e508589e03a7757a7e05b26e834292f5445bfb6","version":"v0.88.7"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14","digest":"sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14@sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14","digest":"sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14@sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14","digest":"sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14@sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.18","digest":"sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.18@sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d","pinned_image":"ghcr.io/github/gh-aw-node@sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d"},{"image":"ghcr.io/github/github-mcp-server:v1.11.0","digest":"sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699","pinned_image":"ghcr.io/github/github-mcp-server:v1.11.0@sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699"}],"mcp_servers":[{"name":"github","tools":["actions_get","actions_list","get_commit","get_file_contents","get_job_logs","get_latest_release","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_releases","list_starred_repositories","list_tags","search_code","search_issues","search_repositories"]},{"name":"safeoutputs","tools":["add_comment","devops_health_investigate","dispatch_workflow","missing_data","missing_tool","noop","update_issue"]}]}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"4eab6ad74076e4cbc81fbae1c91121f8f8ef27d5c047dd58cc9f83e0926461c8","body_hash":"cddefc06a5b2be9db84289576898ec0b4afa041f145ccf84a735c0642ee1d953","compiler_version":"v0.88.7","strict":true,"agent_id":"copilot","agent_model":"${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'gpt-5.6-sol' }}","engine_versions":{"copilot":"1.0.80"}}
+# gh-aw-manifest: {"version":1,"secrets":["COPILOT_PAT_0","COPILOT_PAT_1","COPILOT_PAT_2","COPILOT_PAT_3","COPILOT_PAT_4","COPILOT_PAT_5","COPILOT_PAT_6","COPILOT_PAT_7","COPILOT_PAT_8","COPILOT_PAT_9","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"},{"repo":"github/gh-aw-actions/setup","sha":"5e508589e03a7757a7e05b26e834292f5445bfb6","version":"v0.88.7"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14","digest":"sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14@sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14","digest":"sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14@sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14","digest":"sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14@sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.18","digest":"sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.18@sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d","pinned_image":"ghcr.io/github/gh-aw-node@sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d"},{"image":"ghcr.io/github/github-mcp-server:v1.11.0","digest":"sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699","pinned_image":"ghcr.io/github/github-mcp-server:v1.11.0@sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699"}],"mcp_servers":[{"name":"github","tools":["actions_get","actions_list","get_commit","get_file_contents","get_job_logs","get_latest_release","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_releases","list_starred_repositories","list_tags","search_code","search_issues","search_repositories"]},{"name":"safeoutputs","tools":["missing_data","missing_tool","noop","publish_health_report"]}]}
 # This file was automatically generated by gh-aw (v0.88.7). DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -290,7 +290,7 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: add_comment, update_issue, devops_health_investigate, missing_tool, missing_data, noop\nShared budgets: dispatch-workflow [devops_health_investigate](max:2 total)\n"
+          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: missing_tool, missing_data, noop, publish_health_report\n"
           GH_AW_PROMPT_CONTENT_0002: "</safe-output-tools>\n"
           GH_AW_PROMPT_CONTENT_0003: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_802A9F6A__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_1A3A194A__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_463A214A__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_FF1D34CE__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
           GH_AW_PROMPT_CONTENT_0004: "</system>\n"
@@ -555,7 +555,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"add_comment\":{\"max\":1,\"target\":\"695\"},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"devops-health-investigate\"],\"max\":2,\"workflow_files\":{\"devops-health-investigate\":\".lock.yml\"},\"workflows\":[\"devops-health-investigate\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"},\"update_issue\":{\"allow_body\":true,\"max\":1,\"target\":\"695\"}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"},\"publish-health-report\":{\"description\":\"Persist dashboard state, then comment and dispatch investigations\",\"inputs\":{\"body\":{\"default\":null,\"description\":\"Complete validated replacement body for issue 695\",\"required\":true,\"type\":\"string\"},\"comment_body\":{\"default\":null,\"description\":\"Daily audit comment body\",\"required\":true,\"type\":\"string\"},\"dispatches_json\":{\"default\":null,\"description\":\"At most two investigator inputs as one exact fenced JSON block\",\"required\":true,\"type\":\"string\"},\"investigation_rows_json\":{\"default\":null,\"description\":\"Structured investigation rows as one exact fenced JSON block\",\"required\":true,\"type\":\"string\"},\"state_json\":{\"default\":null,\"description\":\"Dashboard state as one exact fenced JSON block\",\"required\":true,\"type\":\"string\"}}}}"
         with:
           script: |
             const path = require('path');
@@ -568,143 +568,50 @@ jobs:
         env:
           GH_AW_TOOLS_META_JSON: |
             {
-              "description_suffixes": {
-                "add_comment": " CONSTRAINTS: Maximum 1 comment(s) can be added. Target: 695. Supports reply_to_id for discussion threading.",
-                "update_issue": " CONSTRAINTS: Maximum 1 issue(s) can be updated. Target: 695."
-              },
+              "description_suffixes": {},
               "repo_params": {},
               "dynamic_tools": [
                 {
-                  "_workflow_name": "devops-health-investigate",
-                  "description": "Dispatch the 'devops-health-investigate' workflow with workflow_dispatch trigger. This workflow must support workflow_dispatch and be in .github/workflows/ directory in the same repository. Use the 'ref' parameter to target a specific branch or tag (allowed patterns: refs/heads/${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}).",
+                  "description": "Persist dashboard state, then comment and dispatch investigations",
                   "inputSchema": {
                     "additionalProperties": false,
                     "properties": {
-                      "aw_context": {
-                        "default": "",
-                        "description": "Agent caller context (used internally by Agentic Workflows).",
+                      "body": {
+                        "description": "Complete validated replacement body for issue 695",
                         "type": "string"
                       },
-                      "correlation_id": {
-                        "description": "Unique ID linking this investigation to the health check run",
+                      "comment_body": {
+                        "description": "Daily audit comment body",
                         "type": "string"
                       },
-                      "dry_run": {
-                        "default": false,
-                        "description": "Investigate without posting a comment",
-                        "type": "boolean"
-                      },
-                      "finding_id": {
-                        "description": "Fingerprint ID of the finding to investigate",
+                      "dispatches_json": {
+                        "description": "At most two investigator inputs as one exact fenced JSON block",
                         "type": "string"
                       },
-                      "finding_severity": {
-                        "description": "Severity: critical | warning | info",
+                      "investigation_rows_json": {
+                        "description": "Structured investigation rows as one exact fenced JSON block",
                         "type": "string"
                       },
-                      "finding_title": {
-                        "description": "Display-only title; the worker regenerates a trusted title",
-                        "type": "string"
-                      },
-                      "finding_type": {
-                        "description": "Category: pipeline | infra | resource",
-                        "type": "string"
-                      },
-                      "health_issue_number": {
-                        "description": "Dashboard issue number; must equal 695",
-                        "type": "string"
-                      },
-                      "ref": {
-                        "description": "The git ref (branch, tag, or SHA) to dispatch the workflow on. Must match one of the configured allowed ref patterns: refs/heads/${GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH}. If omitted, the ref is resolved from the triggering context, including the pull request head for pull request comments.",
-                        "type": "string"
-                      },
-                      "resource_url": {
-                        "description": "URL to the primary resource (run, PR, etc.)",
+                      "state_json": {
+                        "description": "Dashboard state as one exact fenced JSON block",
                         "type": "string"
                       }
                     },
                     "required": [
-                      "correlation_id",
-                      "finding_id",
-                      "finding_severity",
-                      "finding_title",
-                      "finding_type",
-                      "health_issue_number",
-                      "resource_url"
+                      "body",
+                      "comment_body",
+                      "dispatches_json",
+                      "investigation_rows_json",
+                      "state_json"
                     ],
                     "type": "object"
                   },
-                  "name": "devops_health_investigate"
+                  "name": "publish_health_report"
                 }
               ]
             }
           GH_AW_VALIDATION_JSON: |
             {
-              "add_comment": {
-                "defaultMax": 1,
-                "fields": {
-                  "body": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000
-                  },
-                  "comment_id": {
-                    "optionalPositiveInteger": true
-                  },
-                  "item_number": {
-                    "issueOrPRNumber": true
-                  },
-                  "pr": {
-                    "issueOrPRNumber": true
-                  },
-                  "pr_number": {
-                    "issueOrPRNumber": true
-                  },
-                  "reply_to_id": {
-                    "type": "string",
-                    "maxLength": 256
-                  },
-                  "repo": {
-                    "type": "string",
-                    "maxLength": 256
-                  },
-                  "target": {
-                    "type": "string",
-                    "enum": [
-                      "status"
-                    ]
-                  },
-                  "temporary_id": {
-                    "type": "string",
-                    "pattern": "^#?aw_[A-Za-z0-9_]{3,12}$"
-                  }
-                }
-              },
-              "dispatch_workflow": {
-                "defaultMax": 1,
-                "fields": {
-                  "inputs": {
-                    "type": "object"
-                  },
-                  "ref": {
-                    "type": "string",
-                    "maxLength": 256,
-                    "minLength": 1,
-                    "pattern": "^[^\\x00-\\x20\\x7f~^:?*\\[\\\\]+$",
-                    "patternError": "must be a valid git ref"
-                  },
-                  "workflow_name": {
-                    "required": true,
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 256,
-                    "minLength": 1,
-                    "pattern": ".*\\S.*",
-                    "patternError": "must not be empty"
-                  }
-                }
-              },
               "missing_data": {
                 "defaultMax": 20,
                 "fields": {
@@ -761,60 +668,8 @@ jobs:
                     "maxLength": 65000
                   }
                 }
-              },
-              "update_issue": {
-                "defaultMax": 1,
-                "fields": {
-                  "assignees": {
-                    "type": "array",
-                    "itemType": "string",
-                    "itemSanitize": true,
-                    "itemMaxLength": 39
-                  },
-                  "body": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000
-                  },
-                  "issue_number": {
-                    "issueOrPRNumber": true
-                  },
-                  "labels": {
-                    "type": "array"
-                  },
-                  "milestone": {
-                    "optionalPositiveInteger": true
-                  },
-                  "operation": {
-                    "type": "string",
-                    "enum": [
-                      "replace",
-                      "append",
-                      "prepend",
-                      "replace-island"
-                    ]
-                  },
-                  "repo": {
-                    "type": "string",
-                    "maxLength": 256
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "open",
-                      "closed"
-                    ]
-                  },
-                  "title": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 128
-                  }
-                },
-                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone"
               }
             }
-          GH_AW_GITHUB_EVENT_REPOSITORY_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
@@ -1267,6 +1122,7 @@ jobs:
       - agent
       - detection
       - pat_pool
+      - publish_health_report
       - safe_outputs
     if: >
       always() && (needs.agent.result != 'skipped' || needs.activation.outputs.lockdown_check_failed == 'true' ||
@@ -1277,7 +1133,6 @@ jobs:
     permissions:
       actions: write
       issues: write
-      pull-requests: write
     concurrency:
       group: "gh-aw-conclusion-devops-health-check"
       cancel-in-progress: false
@@ -1911,6 +1766,597 @@ jobs:
             const { main } = require(path.join(actionsDir, 'check_membership.cjs'));
             await main();
 
+  publish_health_report:
+    needs:
+      - agent
+      - detection
+    if: >
+      (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'publish_health_report') &&
+      (needs.agent.result == 'success' && needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' &&
+      contains(needs.agent.outputs.output_types, 'publish_health_report'))
+    runs-on: ubuntu-latest
+    environment: copilot-pat-pool
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+    steps:
+      - name: Download agent output artifact
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: "{agent,agent-output-fallback}"
+          merge-multiple: true
+          path: ${{ runner.temp }}/gh-aw/safe-jobs/
+      - name: Publish dashboard and dependent outputs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
+        env:
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+          GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
+        with:
+          script: |
+            const fs = require("fs");
+
+            const outputPath = process.env.GH_AW_AGENT_OUTPUT;
+            if (!outputPath) {
+              core.setFailed("GH_AW_AGENT_OUTPUT is not set");
+              return;
+            }
+
+            const output = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+            const items = (output.items || []).filter(
+              item => item.type === "publish_health_report"
+            );
+            if (items.length !== 1) {
+              core.setFailed(`Expected one publish_health_report item, got ${items.length}`);
+              return;
+            }
+
+            const item = items[0];
+            const stateToken = "DEVOPS_HEALTH_STATE_SLOT_V1";
+            const rowsToken = "DEVOPS_HEALTH_INVESTIGATION_ROWS_SLOT_V1";
+            const countToken = (text, token) => text.split(token).length - 1;
+            if (
+              typeof item.body !== "string" ||
+              !item.body.startsWith("# 🏥 Daily Health Check — ") ||
+              countToken(item.body, stateToken) !== 1 ||
+              countToken(item.body, rowsToken) !== 1
+            ) {
+              core.setFailed("Dashboard body is missing required publication placeholders");
+              return;
+            }
+            const requiredSections = [
+              "## 🆕 New Findings (",
+              "## 🔍 Investigation Results",
+              rowsToken,
+              "## ✅ Resolved Since Yesterday (",
+              "## 📌 Existing Findings (",
+              "## 📊 Trends (7-day)",
+              stateToken,
+            ];
+            const sectionPositions = requiredSections.map(section =>
+              item.body.indexOf(section)
+            );
+            if (
+              requiredSections.some(
+                section => countToken(item.body, section) !== 1
+              ) ||
+              sectionPositions.some(
+                (position, index) =>
+                  position < 0 ||
+                  (index > 0 && position <= sectionPositions[index - 1])
+              )
+            ) {
+              core.setFailed("Dashboard body sections are missing, duplicated, or out of order");
+              return;
+            }
+            if (
+              typeof item.comment_body !== "string" ||
+              item.comment_body.length > 65000 ||
+              !item.comment_body.startsWith("## 📋 Health Check — ")
+            ) {
+              core.setFailed("Audit comment is missing, oversized, or has the wrong heading");
+              return;
+            }
+
+            const [owner, repo] = process.env.EXPECTED_REPOSITORY.split("/");
+            const allowedTypes = new Set(["pipeline", "infra", "resource"]);
+            const allowedSeverities = new Set(["critical", "warning", "info"]);
+            const exactKeys = (value, keys) =>
+              value !== null &&
+              typeof value === "object" &&
+              !Array.isArray(value) &&
+              JSON.stringify(Object.keys(value).sort()) ===
+                JSON.stringify([...keys].sort());
+            const validDate = value =>
+              typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+            const validCount = value =>
+              typeof value === "number" &&
+              Number.isFinite(value) &&
+              value >= 0;
+            const validRepositoryUrl = value => {
+              if (
+                typeof value !== "string" ||
+                value.length > 500 ||
+                /[\s()[\]|<>\\]/.test(value)
+              ) {
+                return false;
+              }
+              try {
+                const url = new URL(value);
+                return (
+                  url.protocol === "https:" &&
+                  url.hostname === "github.com" &&
+                  url.username === "" &&
+                  url.password === "" &&
+                  url.port === "" &&
+                  (
+                    url.pathname === `/${owner}/${repo}` ||
+                    url.pathname.startsWith(`/${owner}/${repo}/`)
+                  )
+                );
+              } catch {
+                return false;
+              }
+            };
+            const validIssueCommentUrl = value => {
+              if (!validRepositoryUrl(value)) {
+                return false;
+              }
+              const url = new URL(value);
+              return (
+                new RegExp(`^/${owner}/${repo}/issues/\\d+$`).test(
+                  url.pathname
+                ) &&
+                url.search === "" &&
+                /^#issuecomment-\d+$/.test(url.hash)
+              );
+            };
+            const validFingerprint = value => {
+              if (
+                typeof value !== "string" ||
+                value.length > 300 ||
+                /[\r\n]/.test(value)
+              ) {
+                return false;
+              }
+              const component = "[a-z0-9][a-z0-9._/()=-]*";
+              return (
+                /^pipeline:evaluation:failure-rate:(critical|warning)$/.test(value) ||
+                /^pipeline:evaluation:schedule-cancellation:(critical|warning)$/.test(value) ||
+                new RegExp(`^pipeline:${component}:${component}:timeout$`).test(value) ||
+                new RegExp(
+                  `^pipeline:${component}:${component}:${component}:${component}$`
+                ).test(value) ||
+                /^infra:(no-codeowners|no-dependabot|relaxed-skill-validation|verdict-warn-only|pages-deployment-failed)$/.test(value) ||
+                new RegExp(`^infra:unpinned-action:${component}$`).test(value) ||
+                new RegExp(
+                  `^infra:orphan-skill:${component}:${component}$`
+                ).test(value) ||
+                new RegExp(`^infra:orphan-plugin:${component}$`).test(value) ||
+                /^resource:eval-duration:(critical|warning)$/.test(value) ||
+                value === "resource:cost-increase"
+              );
+            };
+            const expectedSeverityForFingerprint = fingerprint => {
+              if (fingerprint.startsWith("pipeline:copilot-code-review")) {
+                return "info";
+              }
+              if (
+                /^pipeline:evaluation:(failure-rate|schedule-cancellation):(critical|warning)$/.test(
+                  fingerprint
+                )
+              ) {
+                return fingerprint.endsWith(":critical")
+                  ? "critical"
+                  : "warning";
+              }
+              if (/^pipeline:[^:]+:[^:]+:timeout$/.test(fingerprint)) {
+                return "warning";
+              }
+              if (/^pipeline:evaluation:[^:]+:[^:]+:[^:]+$/.test(fingerprint)) {
+                return "critical";
+              }
+              if (/^pipeline:[^:]+:[^:]+:[^:]+:[^:]+$/.test(fingerprint)) {
+                return "warning";
+              }
+              if (
+                fingerprint === "infra:verdict-warn-only" ||
+                fingerprint.startsWith("infra:unpinned-action:")
+              ) {
+                return "info";
+              }
+              if (fingerprint === "infra:pages-deployment-failed") {
+                return "critical";
+              }
+              if (fingerprint.startsWith("infra:")) {
+                return "warning";
+              }
+              if (/^resource:eval-duration:(critical|warning)$/.test(fingerprint)) {
+                return fingerprint.endsWith(":critical")
+                  ? "critical"
+                  : "warning";
+              }
+              if (fingerprint === "resource:cost-increase") {
+                return "warning";
+              }
+              return null;
+            };
+            const validNumericObject = value =>
+              value !== null &&
+              typeof value === "object" &&
+              !Array.isArray(value) &&
+              Object.keys(value).length <= 20 &&
+              Object.values(value).every(validCount);
+            const parseFencedJson = (value, name, maxLength) => {
+              if (typeof value !== "string" || value.length > maxLength) {
+                throw new Error(`${name} is missing or oversized`);
+              }
+              const match = /^```json\r?\n([\s\S]*)\r?\n```$/.exec(value);
+              if (!match) {
+                throw new Error(`${name} must be one exact fenced JSON block`);
+              }
+              return JSON.parse(match[1]);
+            };
+
+            let state;
+            try {
+              state = parseFencedJson(item.state_json, "state_json", 100000);
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
+            if (
+              !exactKeys(state, ["active_findings", "history"]) ||
+              !Array.isArray(state.active_findings) ||
+              state.active_findings.length > 100 ||
+              !Array.isArray(state.history) ||
+              state.history.length > 14
+            ) {
+              core.setFailed("Dashboard state has an invalid top-level schema");
+              return;
+            }
+
+            const stateFindings = new Map();
+            for (const finding of state.active_findings) {
+              if (
+                !exactKeys(finding, [
+                  "category",
+                  "fingerprint",
+                  "first_seen",
+                  "occurrences",
+                  "severity",
+                  "title",
+                  "url",
+                ]) ||
+                !validFingerprint(finding.fingerprint) ||
+                !allowedTypes.has(finding.category) ||
+                !finding.fingerprint.startsWith(`${finding.category}:`) ||
+                !allowedSeverities.has(finding.severity) ||
+                finding.severity !==
+                  expectedSeverityForFingerprint(finding.fingerprint) ||
+                typeof finding.title !== "string" ||
+                finding.title.length === 0 ||
+                finding.title.length > 200 ||
+                !validRepositoryUrl(finding.url) ||
+                !validDate(finding.first_seen) ||
+                !validCount(finding.occurrences) ||
+                stateFindings.has(finding.fingerprint)
+              ) {
+                core.setFailed("Dashboard state contains an invalid active finding");
+                return;
+              }
+              stateFindings.set(finding.fingerprint, finding);
+            }
+            for (const history of state.history) {
+              if (
+                !exactKeys(history, [
+                  "by_severity",
+                  "date",
+                  "existing_count",
+                  "metrics",
+                  "new_count",
+                  "resolved_count",
+                ]) ||
+                !validDate(history.date) ||
+                !validCount(history.new_count) ||
+                !validCount(history.existing_count) ||
+                !validCount(history.resolved_count) ||
+                !validNumericObject(history.by_severity) ||
+                !validNumericObject(history.metrics)
+              ) {
+                core.setFailed("Dashboard state contains an invalid history entry");
+                return;
+              }
+            }
+
+            let investigationRows;
+            try {
+              investigationRows = parseFencedJson(
+                item.investigation_rows_json,
+                "investigation_rows_json",
+                100000
+              );
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
+            if (
+              !Array.isArray(investigationRows) ||
+              investigationRows.length > 100
+            ) {
+              core.setFailed("investigation_rows_json must contain at most 100 rows");
+              return;
+            }
+            const escapeCell = value =>
+              value
+                .replace(/\\/g, "\\\\")
+                .replace(/\r\n|\r|\n/g, " ")
+                .replace(/([|[\]()`*_<>&])/g, "\\$1")
+                .replace(/@/g, "&#64;");
+            const seenRows = new Set();
+            const rowStatusByFingerprint = new Map();
+            const renderedRows = [];
+            for (const row of investigationRows) {
+              if (
+                !exactKeys(row, [
+                  "fingerprint",
+                  "result_summary",
+                  "result_url",
+                  "status",
+                ]) ||
+                !validFingerprint(row.fingerprint) ||
+                !["pending", "dispatched", "done", "skipped"].includes(row.status) ||
+                typeof row.result_summary !== "string" ||
+                row.result_summary.length > 300 ||
+                typeof row.result_url !== "string" ||
+                row.result_summary.includes(stateToken) ||
+                row.result_summary.includes(rowsToken) ||
+                row.result_url.includes(stateToken) ||
+                row.result_url.includes(rowsToken) ||
+                seenRows.has(row.fingerprint)
+              ) {
+                core.setFailed("An investigation row failed schema validation");
+                return;
+              }
+              const finding = stateFindings.get(row.fingerprint);
+              if (!finding) {
+                core.setFailed("An investigation row is not active in persisted state");
+                return;
+              }
+              if (
+                row.status === "done" &&
+                (
+                  row.result_summary.length === 0 ||
+                  !validIssueCommentUrl(row.result_url)
+                )
+              ) {
+                core.setFailed("A completed investigation row has an invalid result");
+                return;
+              }
+              if (
+                row.status !== "done" &&
+                (row.result_summary !== "" || row.result_url !== "")
+              ) {
+                core.setFailed("An incomplete investigation row contains result data");
+                return;
+              }
+              const severityEmoji = {
+                critical: "🔴",
+                warning: "🟡",
+                info: "🔵",
+              }[finding.severity];
+              const statusText = {
+                pending: "⏳ Pending — dispatch budget reached",
+                dispatched: "🔄 Dispatched",
+                done: "✅ Done",
+                skipped: "⏳ Skipped",
+              }[row.status];
+              let resultText = "Investigation not dispatched";
+              if (row.status === "pending") {
+                resultText = "Awaiting a later dispatch slot";
+              } else if (row.status === "dispatched") {
+                resultText =
+                  `[⏳ Investigation dispatched — results arriving shortly...](${finding.url})`;
+              } else if (row.status === "done") {
+                resultText =
+                  `[${escapeCell(row.result_summary)}](${row.result_url})`;
+              }
+              renderedRows.push(
+                `| [](https://github.com/${owner}/${repo}/issues/695` +
+                `#investigation-fingerprint:${finding.fingerprint}) ` +
+                `${escapeCell(finding.title)} | ${severityEmoji} ${finding.severity} | ` +
+                `${statusText} | ${finding.first_seen} | ${resultText} |`
+              );
+              seenRows.add(row.fingerprint);
+              rowStatusByFingerprint.set(row.fingerprint, row.status);
+            }
+
+            let dispatches;
+            try {
+              dispatches = parseFencedJson(
+                item.dispatches_json,
+                "dispatches_json",
+                20000
+              );
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
+            }
+            if (!Array.isArray(dispatches) || dispatches.length > 2) {
+              core.setFailed("dispatches_json must contain an array of at most two items");
+              return;
+            }
+
+            const correlations = new Set();
+            const dispatchedFindings = new Set();
+            for (const dispatch of dispatches) {
+              const keys = Object.keys(dispatch).sort();
+              const expectedKeys = [
+                "correlation_id",
+                "finding_id",
+                "finding_severity",
+                "finding_title",
+                "finding_type",
+                "health_issue_number",
+                "resource_url",
+              ];
+              if (JSON.stringify(keys) !== JSON.stringify(expectedKeys)) {
+                core.setFailed("A dispatch item has unexpected or missing fields");
+                return;
+              }
+              if (
+                !allowedTypes.has(dispatch.finding_type) ||
+                !validFingerprint(dispatch.finding_id) ||
+                !dispatch.finding_id.startsWith(`${dispatch.finding_type}:`) ||
+                !allowedSeverities.has(dispatch.finding_severity) ||
+                dispatch.health_issue_number !== "695" ||
+                typeof dispatch.finding_title !== "string" ||
+                dispatch.finding_title.length === 0 ||
+                dispatch.finding_title.length > 200 ||
+                typeof dispatch.correlation_id !== "string" ||
+                !new RegExp(
+                  `^hc-\\d{4}-\\d{2}-\\d{2}-${context.runId}-\\d+$`
+                ).test(dispatch.correlation_id) ||
+                correlations.has(dispatch.correlation_id) ||
+                dispatchedFindings.has(dispatch.finding_id) ||
+                !validRepositoryUrl(dispatch.resource_url)
+              ) {
+                core.setFailed("A dispatch item failed field validation");
+                return;
+              }
+              const persistedFinding = stateFindings.get(dispatch.finding_id);
+              if (
+                !persistedFinding ||
+                persistedFinding.category !== dispatch.finding_type ||
+                persistedFinding.severity !== dispatch.finding_severity ||
+                persistedFinding.title !== dispatch.finding_title ||
+                persistedFinding.url !== dispatch.resource_url
+              ) {
+                core.setFailed("A dispatch item does not match persisted dashboard state");
+                return;
+              }
+              correlations.add(dispatch.correlation_id);
+              dispatchedFindings.add(dispatch.finding_id);
+            }
+            for (const findingId of dispatchedFindings) {
+              if (rowStatusByFingerprint.get(findingId) !== "dispatched") {
+                core.setFailed(
+                  "A dispatch item lacks a persisted dispatched investigation row"
+                );
+                return;
+              }
+            }
+
+            const serializedState = JSON.stringify(state);
+            if (
+              serializedState.includes("<!--") ||
+              serializedState.includes("-->") ||
+              serializedState.includes(stateToken) ||
+              serializedState.includes(rowsToken)
+            ) {
+              core.setFailed(
+                "Dashboard state contains a reserved delimiter or publication sentinel"
+              );
+              return;
+            }
+            const stateMarker =
+              `<!-- devops-health-state:v1\n${serializedState}\n-->`;
+            const publishedBody = item.body
+              .replace(stateToken, () => stateMarker)
+              .replace(rowsToken, () => renderedRows.join("\n"));
+            if (publishedBody.length > 60000) {
+              core.setFailed("Rendered dashboard body exceeds 60000 characters");
+              return;
+            }
+
+            const dashboard = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: 695,
+            });
+            const repository = await github.rest.repos.get({ owner, repo });
+            const defaultBranch = repository.data.default_branch;
+            const labels = dashboard.data.labels.map(label =>
+              typeof label === "string" ? label : label.name
+            );
+            if (
+              dashboard.data.state !== "open" ||
+              dashboard.data.title !== "🏥 Repository Health Dashboard" ||
+              !labels.includes("devops-health")
+            ) {
+              core.setFailed("Issue 695 failed canonical dashboard validation");
+              return;
+            }
+            if (typeof defaultBranch !== "string" || defaultBranch.length === 0) {
+              core.setFailed("Repository default branch is unavailable");
+              return;
+            }
+
+            // Persistence is the prerequisite. Any failure throws and stops
+            // before the comment or workflow dispatch operations.
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number: 695,
+              body: publishedBody,
+            });
+
+            for (const dispatch of dispatches) {
+              const expectedRunName =
+                `DevOps Health Investigation — ${dispatch.correlation_id}`;
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: "devops-health-investigate.lock.yml",
+                branch: defaultBranch,
+                event: "workflow_dispatch",
+                per_page: 100,
+              });
+              const alreadyDispatched = runs.data.workflow_runs.some(
+                run => run.display_title === expectedRunName
+              );
+              if (!alreadyDispatched) {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id: "devops-health-investigate.lock.yml",
+                  ref: defaultBranch,
+                  inputs: dispatch,
+                });
+              }
+            }
+
+            const publicationMarker =
+              `<!-- devops-health-publication:${context.runId} -->`;
+            let commentExists = false;
+            const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+              .toISOString();
+            for (let page = 1; page <= 5 && !commentExists; page += 1) {
+              const comments = await github.rest.issues.listComments({
+                owner,
+                repo,
+                issue_number: 695,
+                since,
+                per_page: 100,
+                page,
+              });
+              commentExists = comments.data.some(
+                comment => comment.body?.includes(publicationMarker)
+              );
+              if (comments.data.length < 100) {
+                break;
+              }
+            }
+            if (!commentExists) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: 695,
+                body: `${item.comment_body}\n\n${publicationMarker}`,
+              });
+            }
+
   safe_outputs:
     needs:
       - activation
@@ -1919,10 +2365,7 @@ jobs:
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
     runs-on: ubuntu-slim
     environment: copilot-pat-pool
-    permissions:
-      actions: write
-      issues: write
-      pull-requests: write
+    permissions: {}
     timeout-minutes: 45
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
@@ -1942,8 +2385,6 @@ jobs:
     outputs:
       code_push_failure_count: ${{ steps.process_safe_outputs.outputs.code_push_failure_count }}
       code_push_failure_errors: ${{ steps.process_safe_outputs.outputs.code_push_failure_errors }}
-      comment_id: ${{ steps.process_safe_outputs.outputs.comment_id }}
-      comment_url: ${{ steps.process_safe_outputs.outputs.comment_url }}
       create_discussion_error_count: ${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}
       create_discussion_errors: ${{ steps.process_safe_outputs.outputs.create_discussion_errors }}
       process_safe_outputs_items_applied: ${{ steps.process_safe_outputs.outputs.items_applied }}
@@ -2008,7 +2449,8 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"max\":1,\"target\":\"695\"},\"dispatch_workflow\":{\"allowed_refs\":[\"refs/heads/${{ github.event.repository.default_branch }}\"],\"aw_context_workflows\":[\"devops-health-investigate\"],\"max\":2,\"workflow_files\":{\"devops-health-investigate\":\".lock.yml\"},\"workflows\":[\"devops-health-investigate\"]},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"},\"update_issue\":{\"allow_body\":true,\"max\":1,\"target\":\"695\"}}"
+          GH_AW_SAFE_OUTPUT_JOBS: "{\"publish_health_report\":\"\"}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
