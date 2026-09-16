@@ -167,7 +167,10 @@ Parse each comment into one of these categories:
 
 For each **Investigation** comment, extract:
 - `finding_id` from the `**Finding ID:** \`{id}\`` line
-- `executive_summary` from the `**Executive Summary:**` line (everything after the label)
+- `executive_summary` from the `**Executive Summary:**` line. Collapse
+  whitespace to one line, limit it to 512 characters, and replace `]`, `|`,
+  carriage returns, and newlines with safe plain-text equivalents before using
+  it as a Markdown link label.
 - `correlation_id` from the `**Correlation:**` line
 - `comment_url` = the comment's `html_url`
 - `comment_id` = the comment's `id`

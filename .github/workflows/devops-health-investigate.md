@@ -6,7 +6,7 @@ description: >
   Dispatched by the health check orchestrator. It reports evidence,
   root cause, blast radius, and a proposed remediation without modifying
   repository files or executing repository code.
-run-name: "DevOps Health Investigation — ${{ inputs.correlation_id }}"
+run-name: "DevOps Health Investigation · ${{ inputs.correlation_id }}"
 
 on:
   permissions: {}

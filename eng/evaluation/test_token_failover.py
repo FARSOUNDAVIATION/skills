@@ -233,6 +233,7 @@ def run_health_publisher(
     existing_runs: list[dict[str, object]] | None = None,
     existing_comments: list[dict[str, object]] | None = None,
     initial_body: str = "",
+    complete_template: bool = True,
 ) -> dict[str, object]:
     node = shutil.which("node")
     if not node:
@@ -242,8 +243,43 @@ def run_health_publisher(
         temp_path = Path(temp_dir)
         output_path = temp_path / "agent-output.json"
         harness_path = temp_path / "publisher-harness.cjs"
+        normalized_item = dict(item)
+        if complete_template:
+            body = str(normalized_item["dashboard_body"])
+            missing_sections = []
+            for pattern, heading in (
+                (r"^## 🆕 New Findings \([0-9]+\)$", "## 🆕 New Findings (0)"),
+                (
+                    r"^## ✅ Resolved Since Yesterday \([0-9]+\)$",
+                    "## ✅ Resolved Since Yesterday (0)",
+                ),
+                (
+                    r"^## 📌 Existing Findings \([0-9]+\)$",
+                    "## 📌 Existing Findings (0)",
+                ),
+                (r"^## 📊 Trends \(7-day\)$", "## 📊 Trends (7-day)"),
+            ):
+                if not re.search(pattern, body, re.MULTILINE):
+                    missing_sections.append(heading)
+            if missing_sections:
+                body = body.replace(
+                    "<!-- devops-health-state:v1",
+                    "\n\n".join(missing_sections)
+                    + "\n\n<!-- devops-health-state:v1",
+                    1,
+                )
+            normalized_item["dashboard_body"] = body
         output_path.write_text(
-            json.dumps({"items": [{"type": "publish_health_dashboard", **item}]}),
+            json.dumps(
+                {
+                    "items": [
+                        {
+                            "type": "publish_health_dashboard",
+                            **normalized_item,
+                        }
+                    ]
+                }
+            ),
             encoding="utf-8",
         )
         fail_dispatch = "null" if fail_dispatch_at is None else str(fail_dispatch_at)
@@ -540,12 +576,15 @@ class TokenFailoverTests(unittest.TestCase):
         )
         self.assertIn("issue.updated_at !== expectedUpdatedAt", publisher_script)
         self.assertIn("Only github.com links are allowed", publisher_script)
+        self.assertIn("Protocol-relative links are not allowed", publisher_script)
+        self.assertIn("requiredDashboardPatterns", publisher_script)
         self.assertIn("Dashboard state root schema is invalid", publisher_script)
         self.assertIn("Dashboard active finding schema is invalid", publisher_script)
         self.assertIn("Dashboard history schema is invalid", publisher_script)
         self.assertIn(".toISOString()", publisher_script)
         self.assertIn("github.rest.issues.getComment", publisher_script)
         self.assertIn("Done row comment verification failed", publisher_script)
+        self.assertIn("Active outbox correlation changed", publisher_script)
         self.assertIn(
             "(dashboardBody.match(/<!-- devops-health-state:v1/g) || []).length !== 1",
             publisher_script,
@@ -718,6 +757,8 @@ class TokenFailoverTests(unittest.TestCase):
             normalized_groom,
         )
         self.assertIn("Validate completed rows", groom)
+        self.assertIn("limit it to 512 characters", normalized_groom)
+        self.assertIn("replace `]`, `|`", normalized_groom)
         self.assertIn("⏳ Pending", health_check)
         self.assertIn(
             "Pending rows remain eligible",
@@ -796,6 +837,31 @@ class TokenFailoverTests(unittest.TestCase):
 
         self.assertFalse(result["ok"])
         self.assertIn("Dashboard state JSON is invalid", result["error"])
+        self.assertEqual(result["calls"], [])
+
+        incomplete_template_body = """# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+
+<!-- devops-health-state:v1
+{"active_findings":[],"history":[]}
+-->
+"""
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": incomplete_template_body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": "[]",
+            },
+            complete_template=False,
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("Dashboard or daily comment structure", result["error"])
         self.assertEqual(result["calls"], [])
 
         duplicate_finding = {
@@ -1305,6 +1371,26 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Duplicate row correlation", result["error"])
         self.assertEqual(result["calls"], [])
 
+        dispatched_without_correlation = body.replace(
+            "⏳ Pending",
+            "🔄 Dispatched",
+        ).replace(
+            " ⏳ Awaiting investigation result <!-- correlation:hc-400-1 -->",
+            " Investigation started",
+        )
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": dispatched_without_correlation,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": "[]",
+            },
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("In-flight row has invalid correlation", result["error"])
+        self.assertEqual(result["calls"], [])
+
     def test_devops_health_publisher_reconciles_accepted_dispatch(self) -> None:
         finding = {
             "fingerprint": "pipeline:evaluation:evaluate:build:failure",
@@ -1488,6 +1574,22 @@ class TokenFailoverTests(unittest.TestCase):
             ["get", "update", "repo", "comment"],
         )
 
+        unsafe = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": body.replace(
+                    "`owner/action@v1` should use a commit SHA.",
+                    "[details](//attacker.example/path)",
+                ),
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": "[]",
+            },
+        )
+        self.assertFalse(unsafe["ok"])
+        self.assertIn("Protocol-relative links are not allowed", unsafe["error"])
+        self.assertEqual(unsafe["calls"], [])
+
     def test_devops_health_investigation_is_report_only(self) -> None:
         investigate_source = (
             REPO_ROOT / ".github" / "workflows" / "devops-health-investigate.md"
@@ -1664,6 +1766,11 @@ class TokenFailoverTests(unittest.TestCase):
             investigate,
         )
         self.assertNotIn("hc-{YYYY-MM-DD}", investigate)
+        self.assertIn(
+            'run-name: "DevOps Health Investigation · '
+            '${{ inputs.correlation_id }}"',
+            investigate,
+        )
         self.assertIn("bounded `list_commits` and `get_commit`", investigate)
         self.assertIn("searching for the exact suspect commit SHA", investigate)
         investigate_knowledge = (
@@ -1680,10 +1787,18 @@ class TokenFailoverTests(unittest.TestCase):
             "`list_commits`",
             "`get_commit`",
             "`search_pull_requests`",
-            "`get_pull_request_files`",
+            "`pull_request_read`",
+            "`get_files`",
+            "`get_diff`",
             "`get_job_logs`",
         ):
             self.assertIn(available_tool, investigate_knowledge)
+        for unsupported_tool in (
+            "`get_pull_request`",
+            "`get_pull_request_files`",
+            "`get_pull_request_diff`",
+        ):
+            self.assertNotIn(unsupported_tool, investigate_knowledge)
 
         workflow_tests = yaml.safe_load(TEST_WORKFLOW.read_text(encoding="utf-8"))
         triggers = workflow_tests.get("on", workflow_tests.get(True))

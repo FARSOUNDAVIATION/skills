@@ -95,12 +95,36 @@ safe-outputs:
               }
 
               const item = items[0];
+              const validateLinkDestination = destination => {
+                if (destination.startsWith("#")) {
+                  return;
+                }
+                if (destination.startsWith("//")) {
+                  throw new Error(`Protocol-relative links are not allowed: ${destination}`);
+                }
+                const link = new URL(destination);
+                if (link.protocol !== "https:" || link.hostname !== "github.com") {
+                  throw new Error(`Only github.com links are allowed: ${link.href}`);
+                }
+              };
               const validateGitHubLinks = value => {
                 for (const match of value.matchAll(/https?:\/\/[^\s)<>"']+/g)) {
-                  const link = new URL(match[0].replace(/[.,;:!?]+$/, ""));
-                  if (link.protocol !== "https:" || link.hostname !== "github.com") {
-                    throw new Error(`Only github.com links are allowed: ${link.href}`);
-                  }
+                  validateLinkDestination(
+                    match[0].replace(/[.,;:!?]+$/, "")
+                  );
+                }
+                if (/(^|[^:])\/\/[A-Za-z0-9]/m.test(value)) {
+                  throw new Error("Protocol-relative links are not allowed");
+                }
+                for (const match of value.matchAll(
+                  /!?\[[^\]\r\n]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g
+                )) {
+                  validateLinkDestination(match[1]);
+                }
+                for (const match of value.matchAll(
+                  /(?:href|src)\s*=\s*["']([^"']+)["']/gi
+                )) {
+                  validateLinkDestination(match[1]);
                 }
               };
 
@@ -138,9 +162,27 @@ safe-outputs:
               if (typeof expectedUpdatedAt !== "string" || !expectedUpdatedAt) {
                 throw new Error("expected_updated_at is required");
               }
+              const requiredDashboardPatterns = [
+                /^# 🏥 Daily Health Check — (\d{4}-\d{2}-\d{2})$/gm,
+                /^## 🆕 New Findings \([0-9]+\)$/gm,
+                /^## 🔍 Investigation Results$/gm,
+                /^## ✅ Resolved Since Yesterday \([0-9]+\)$/gm,
+                /^## 📌 Existing Findings \([0-9]+\)$/gm,
+                /^## 📊 Trends \(7-day\)$/gm,
+                /^\| Finding ID \| Finding \| Severity \| Investigation \| First Seen \| Result \|$/gm,
+              ];
+              const dashboardDateMatches = [
+                ...dashboardBody.matchAll(requiredDashboardPatterns[0]),
+              ];
               if (
                 (dashboardBody.match(/<!-- devops-health-state:v1/g) || []).length !== 1 ||
-                !dashboardBody.includes("## 🔍 Investigation Results") ||
+                requiredDashboardPatterns.some(
+                  pattern => (dashboardBody.match(pattern) || []).length !== 1
+                ) ||
+                dashboardDateMatches.length !== 1 ||
+                new Date(`${dashboardDateMatches[0][1]}T00:00:00Z`)
+                  .toISOString()
+                  .slice(0, 10) !== dashboardDateMatches[0][1] ||
                 !dailyComment.startsWith("## 📋 Health Check —")
               ) {
                 throw new Error("Dashboard or daily comment structure validation failed");
@@ -390,13 +432,13 @@ safe-outputs:
                   throw new Error(`Duplicate row correlation for ${id}`);
                 }
                 if (
-                  status === "⏳ Pending" &&
+                  (status === "⏳ Pending" || status === "🔄 Dispatched") &&
                   (
                     !correlationMatch ||
                     (result.match(/<!-- correlation:/g) || []).length !== 1
                   )
                 ) {
-                  throw new Error(`Pending row has invalid correlation for ${id}`);
+                  throw new Error(`In-flight row has invalid correlation for ${id}`);
                 }
                 if (correlationMatch) {
                   correlationIds.add(correlationMatch[1]);
@@ -412,7 +454,7 @@ safe-outputs:
                   );
                   const doneResult = result.match(
                     new RegExp(
-                      "^\\[[^\\]\\r\\n]{1,512}\\]\\(" +
+                      "^\\[[^\\]\\r\\n|]{1,512}\\]\\(" +
                         `https://github\\.com/${escapedOwner}/${escapedRepo}` +
                         "/issues/695#issuecomment-([1-9][0-9]*)\\) " +
                         "<!-- correlation:(hc-[1-9][0-9]*-[1-9][0-9]*) -->$"
@@ -1253,7 +1295,7 @@ Before finishing, verify:
   tools. Process API responses and dashboard state in memory. Do not create
   scripts or intermediate files.
 - **CRITICAL — Publisher body must be inline**: The `dashboard_body` field must contain the **complete, literal issue body text**. NEVER write it to a file or use a shell reference.
-- **CRITICAL — Investigation Results section**: The `## 🔍 Investigation Results` section MUST always appear in the issue body template. The downstream [grooming workflow](../workflows/devops-health-groom.md) manages this section via a `replace-island` block. Preserve existing active rows by fingerprint and append new `🔄 Dispatched` rows with their exact fingerprints. Do NOT wrap the section in island markers yourself.
+- **CRITICAL — Investigation Results section**: The `## 🔍 Investigation Results` section MUST always appear in the issue body template. The downstream [grooming workflow](../workflows/devops-health-groom.md) manages this section via a `replace-island` block. Preserve existing active rows by fingerprint and append new `⏳ Pending` rows with their exact fingerprints and correlation markers. Do NOT wrap the section in island markers yourself.
 - **Be data-driven**: Include specific numbers, durations, percentages, and links.
 - **Be precise with fingerprints**: Use the exact fingerprint formulas from the knowledge file. Consistency is critical — the same finding MUST produce the same fingerprint across runs.
 - **First run handling**: If the validated dashboard body has no valid previous

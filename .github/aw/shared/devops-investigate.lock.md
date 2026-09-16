@@ -54,8 +54,8 @@ When `finding_type == "pipeline"`:
 
 6. **Identify the PR that introduced the breaking change**:
    - For each suspect commit, use `search_pull_requests` with the exact SHA.
-   - Verify candidates with `get_pull_request`, `get_pull_request_files`, and
-     `get_pull_request_diff`.
+   - Verify candidates with `pull_request_read`: use method `get` for metadata,
+     `get_files` for changed files, and `get_diff` for the patch.
    - Record the PR number, title, author, and merge date only for a verified
      match.
    - This helps attribute the regression and identify who can help fix it
