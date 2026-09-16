@@ -79,6 +79,7 @@ safe-outputs:
       env:
         EXPECTED_FINDING_ID: ${{ inputs.finding_id }}
         EXPECTED_CORRELATION_ID: ${{ inputs.correlation_id }}
+        EXPECTED_SEVERITY: ${{ inputs.finding_severity }}
       permissions:
         contents: read
         actions: read
@@ -110,12 +111,14 @@ safe-outputs:
               const reportBody = items[0].report_body;
               const findingId = process.env.EXPECTED_FINDING_ID;
               const correlationId = process.env.EXPECTED_CORRELATION_ID;
+              const expectedSeverity = process.env.EXPECTED_SEVERITY;
               if (
                 typeof reportBody !== "string" ||
                 reportBody.length === 0 ||
                 reportBody.length > 65000 ||
                 typeof findingId !== "string" ||
-                typeof correlationId !== "string"
+                typeof correlationId !== "string" ||
+                typeof expectedSeverity !== "string"
               ) {
                 throw new Error("Investigation report inputs are invalid");
               }
@@ -139,6 +142,46 @@ safe-outputs:
               ) {
                 throw new Error("Investigation report identity does not match workflow inputs");
               }
+              const requiredHeadings = [
+                "### Root Cause",
+                "### Blast Radius",
+                "### Suggested Fix",
+                "### Remediation Status",
+                "### Evidence",
+                "### Related",
+              ];
+              if (
+                !reportBody.match(
+                  new RegExp(
+                    `^\\*\\*Severity:\\*\\* ${expectedSeverity}\\s*$`,
+                    "m"
+                  )
+                ) ||
+                !reportBody.match(
+                  /^\*\*Executive Summary:\*\* [^\r\n]{1,512}$/m
+                ) ||
+                !reportBody.match(
+                  /^\*\*Confidence:\*\* (?:High|Medium|Low) — [^\r\n]+$/m
+                ) ||
+                !reportBody.match(/^\*\*Validation:\*\* [^\r\n]+$/m) ||
+                !reportBody.match(/^\*\*Owner:\*\* [^\r\n]+$/m) ||
+                !reportBody.match(/^### Suggested Fix\s*\n1\. \S/m) ||
+                !reportBody.match(/^### Remediation Status\s*\nReport-only\. \S/m) ||
+                requiredHeadings.some(
+                  heading =>
+                    (reportBody.match(
+                      new RegExp(
+                        `^${heading.replace(
+                          /[.*+?^${}()|[\]\\]/g,
+                          "\\$&"
+                        )}\\s*$`,
+                        "gm"
+                      )
+                    ) || []).length !== 1
+                )
+              ) {
+                throw new Error("Investigation report template is incomplete");
+              }
               const correlation = correlationId.match(
                 /^hc-([1-9][0-9]*)-([1-9][0-9]*)$/
               );
@@ -161,11 +204,35 @@ safe-outputs:
                 throw new Error("Correlation does not reference a valid health-check run");
               }
 
-              for (const match of reportBody.matchAll(/https?:\/\/[^\s)<>"']+/g)) {
-                const link = new URL(match[0].replace(/[.,;:!?]+$/, ""));
+              const validateLinkDestination = destination => {
+                if (destination.startsWith("#")) {
+                  return;
+                }
+                if (destination.startsWith("//")) {
+                  throw new Error(`Protocol-relative links are not allowed: ${destination}`);
+                }
+                const link = new URL(destination);
                 if (link.protocol !== "https:" || link.hostname !== "github.com") {
                   throw new Error(`Only github.com links are allowed: ${link.href}`);
                 }
+              };
+              for (const match of reportBody.matchAll(/https?:\/\/[^\s)<>"']+/g)) {
+                validateLinkDestination(
+                  match[0].replace(/[.,;:!?]+$/, "")
+                );
+              }
+              if (/(^|[^:])\/\/[A-Za-z0-9]/m.test(reportBody)) {
+                throw new Error("Protocol-relative links are not allowed");
+              }
+              for (const match of reportBody.matchAll(
+                /!?\[[^\]\r\n]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g
+              )) {
+                validateLinkDestination(match[1]);
+              }
+              for (const match of reportBody.matchAll(
+                /(?:href|src)\s*=\s*["']([^"']+)["']/gi
+              )) {
+                validateLinkDestination(match[1]);
               }
               const prose = reportBody
                 .replace(/```[\s\S]*?```/g, "")
@@ -457,6 +524,9 @@ publish-investigation-report:
     ### Remediation Status
     Report-only. {Trusted evidence, proposed change, validation plan, and owner,
     or why the available evidence cannot verify an exact fix.}
+
+    **Validation:** {targeted validation for a maintainer}
+    **Owner:** {suggested owner}
 
     ### Evidence
     {key log excerpts, API responses, or code references}

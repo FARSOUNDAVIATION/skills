@@ -141,6 +141,7 @@ safe-outputs:
                 /(^|\n)## 🔍 Investigation Results\n[\s\S]*?(?=\n## |\n<!-- devops-health-state:v1|$)/;
               const parseRows = value => {
                 const rows = new Map();
+                const correlations = new Set();
                 for (const line of value.split("\n")) {
                   const match = line.match(
                     /^\| `([^`]+)` \| ([^|]*) \| ([^|]*) \| (⏳ Pending|🔄 Dispatched|✅ Done) \| ([^|]*) \| (.*) \|$/
@@ -151,12 +152,25 @@ safe-outputs:
                   if (rows.has(match[1])) {
                     throw new Error(`Duplicate Investigation Results row for ${match[1]}`);
                   }
+                  const correlationMatches = [
+                    ...match[6].matchAll(
+                      /<!-- correlation:(hc-[1-9][0-9]*-[1-9][0-9]*) -->/g
+                    ),
+                  ];
+                  if (
+                    correlationMatches.length !== 1 ||
+                    correlations.has(correlationMatches[0][1])
+                  ) {
+                    throw new Error(`Invalid row correlation for ${match[1]}`);
+                  }
+                  correlations.add(correlationMatches[0][1]);
                   rows.set(match[1], {
+                    title: match[2].trim(),
+                    severity: match[3].trim(),
                     status: match[4],
+                    first_seen: match[5].trim(),
                     result: match[6],
-                    correlation: match[6].match(
-                      /<!-- correlation:(hc-[1-9][0-9]*-[1-9][0-9]*) -->/
-                    )?.[1],
+                    correlation: correlationMatches[0][1],
                   });
                 }
                 return rows;
@@ -166,32 +180,95 @@ safe-outputs:
                   /<!-- devops-health-state:v1\s*\n([\s\S]*?)\n-->/g
                 ),
               ];
-              let activeIds = null;
-              if (stateMatches.length > 1) {
-                throw new Error("Dashboard state marker is duplicated");
+              if (stateMatches.length !== 1) {
+                throw new Error("Dashboard state marker is missing or duplicated");
               }
-              if (stateMatches.length === 1) {
-                let state;
-                try {
-                  state = JSON.parse(stateMatches[0][1]);
-                } catch (error) {
-                  throw new Error(`Dashboard state JSON is invalid: ${error.message}`);
+              let state;
+              try {
+                state = JSON.parse(stateMatches[0][1]);
+              } catch (error) {
+                throw new Error(`Dashboard state JSON is invalid: ${error.message}`);
+              }
+              if (!Array.isArray(state.active_findings)) {
+                throw new Error("Dashboard active findings are invalid");
+              }
+              const stateFindings = new Map();
+              for (const finding of state.active_findings) {
+                if (
+                  !finding ||
+                  typeof finding.fingerprint !== "string" ||
+                  typeof finding.title !== "string" ||
+                  !["critical", "warning", "info"].includes(finding.severity) ||
+                  typeof finding.first_seen !== "string" ||
+                  stateFindings.has(finding.fingerprint)
+                ) {
+                  throw new Error("Dashboard active finding is invalid");
                 }
-                if (!Array.isArray(state.active_findings)) {
-                  throw new Error("Dashboard active findings are invalid");
-                }
-                activeIds = new Set(
-                  state.active_findings.map(finding => finding?.fingerprint)
-                );
-                if (activeIds.has(undefined) || activeIds.size !== state.active_findings.length) {
-                  throw new Error("Dashboard active finding IDs are invalid");
-                }
+                stateFindings.set(finding.fingerprint, finding);
               }
               const newRows = parseRows(section);
+              const severityLabels = {
+                critical: "🔴 Critical",
+                warning: "🟡 Warning",
+                info: "🔵 Info",
+              };
+              const doneRows = [];
+              for (const [findingId, row] of newRows) {
+                const finding = stateFindings.get(findingId);
+                if (
+                  !finding ||
+                  row.title !== finding.title ||
+                  row.severity !== severityLabels[finding.severity] ||
+                  row.first_seen !== finding.first_seen
+                ) {
+                  throw new Error(
+                    `Investigation Results row does not match active state for ${findingId}`
+                  );
+                }
+                if (row.status === "✅ Done") {
+                  const doneResult = row.result.match(
+                    new RegExp(
+                      "^\\[[^\\]\\r\\n|]{1,512}\\]\\(" +
+                        `https://github\\.com/${context.repo.owner}/${context.repo.repo}` +
+                        "/issues/695#issuecomment-([1-9][0-9]*)\\) " +
+                        `<!-- correlation:${row.correlation} -->$`
+                    )
+                  );
+                  if (!doneResult) {
+                    throw new Error(`Done row result is invalid for ${findingId}`);
+                  }
+                  doneRows.push({
+                    finding_id: findingId,
+                    correlation_id: row.correlation,
+                    comment_id: Number(doneResult[1]),
+                  });
+                }
+              }
+              for (const doneRow of doneRows) {
+                const { data: comment } = await github.rest.issues.getComment({
+                  ...context.repo,
+                  comment_id: doneRow.comment_id,
+                });
+                if (
+                  comment.user?.login !== "github-actions[bot]" ||
+                  comment.issue_url !==
+                    `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/issues/695` ||
+                  !comment.body?.includes(
+                    `**Finding ID:** \`${doneRow.finding_id}\``
+                  ) ||
+                  !comment.body?.includes(
+                    `**Correlation:** ${doneRow.correlation_id}`
+                  )
+                ) {
+                  throw new Error(
+                    `Done row comment verification failed for ${doneRow.finding_id}`
+                  );
+                }
+              }
               const priorIsland = (issue.body || "").match(islandPattern)?.[0] || "";
               const priorRows = parseRows(priorIsland);
               for (const [findingId, priorRow] of priorRows) {
-                const mustPreserve = activeIds === null || activeIds.has(findingId);
+                const mustPreserve = stateFindings.has(findingId);
                 if (!mustPreserve) {
                   continue;
                 }
@@ -214,12 +291,6 @@ safe-outputs:
                     `Active Investigation Results row was not preserved for ${findingId}`
                   );
                 }
-              }
-              if (
-                activeIds !== null &&
-                [...newRows.keys()].some(findingId => !activeIds.has(findingId))
-              ) {
-                throw new Error("Investigation Results contains a non-active finding");
               }
               let nextBody;
               if (islandPattern.test(issue.body || "")) {

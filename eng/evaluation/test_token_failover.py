@@ -212,6 +212,7 @@ def run_investigation_publisher(
     test_case: unittest.TestCase,
     *,
     actor: str = "github-actions[bot]",
+    report_body: str | None = None,
 ) -> dict[str, object]:
     node = shutil.which("node")
     if not node:
@@ -231,13 +232,29 @@ def run_investigation_publisher(
 {json.dumps({"active_findings": [{"fingerprint": finding_id, "category": "pipeline"}], "history": []}, separators=(",", ":"))}
 -->
 """
-    report_body = (
-        "## 🔍 Investigation: Evaluation tests failed\n\n"
-        f"**Finding ID:** `{finding_id}`\n"
-        "**Severity:** critical\n"
-        f"**Correlation:** {correlation_id}\n"
-        "**Executive Summary:** Tests failed."
-    )
+    if report_body is None:
+        report_body = (
+            "## 🔍 Investigation: Evaluation tests failed\n\n"
+            f"**Finding ID:** `{finding_id}`\n"
+            "**Severity:** critical\n"
+            f"**Correlation:** {correlation_id}\n"
+            "**Executive Summary:** Tests failed.\n\n"
+            "### Root Cause\n"
+            "A deterministic test failure was confirmed.\n\n"
+            "**Confidence:** High — the failing assertion identifies the cause.\n\n"
+            "### Blast Radius\n"
+            "The evaluation workflow is affected.\n\n"
+            "### Suggested Fix\n"
+            "1. Correct the failing test setup.\n\n"
+            "### Remediation Status\n"
+            "Report-only. A maintainer should apply the proposed change.\n\n"
+            "**Validation:** Run the targeted evaluation test.\n"
+            "**Owner:** Evaluation maintainers\n\n"
+            "### Evidence\n"
+            "The failed workflow run and repository files agree.\n\n"
+            "### Related\n"
+            "None found."
+        )
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         output_path = temp_path / "agent-output.json"
@@ -314,6 +331,7 @@ const context = {{
                 "GH_AW_AGENT_OUTPUT": str(output_path),
                 "EXPECTED_FINDING_ID": finding_id,
                 "EXPECTED_CORRELATION_ID": correlation_id,
+                "EXPECTED_SEVERITY": "critical",
             }
         )
         completed = subprocess.run(
@@ -786,6 +804,14 @@ class TokenFailoverTests(unittest.TestCase):
             "Active Investigation Results row was not preserved",
             groom_script,
         )
+        self.assertIn(
+            "Done row comment verification failed",
+            groom_script,
+        )
+        self.assertIn(
+            "Investigation Results row does not match active state",
+            groom_script,
+        )
         groom_manifest = json.loads(
             groom_lock_text.splitlines()[1].removeprefix("# gh-aw-manifest: ")
         )
@@ -996,7 +1022,7 @@ class TokenFailoverTests(unittest.TestCase):
 {section}
 
 <!-- devops-health-state:v1
-{json.dumps({"active_findings": [{"fingerprint": finding_id}], "history": []}, separators=(",", ":"))}
+{json.dumps({"active_findings": [{"fingerprint": finding_id, "title": "Evaluation tests failed", "severity": "critical", "first_seen": "2026-09-16"}], "history": []}, separators=(",", ":"))}
 -->
 """
         empty_section = """## 🔍 Investigation Results
@@ -1912,6 +1938,47 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertFalse(manual["ok"])
         self.assertIn("github-actions[bot] provenance", manual["error"])
         self.assertEqual(manual["calls"], [])
+
+        incomplete = run_investigation_publisher(
+            self,
+            report_body=(
+                "## 🔍 Investigation: Evaluation tests failed\n\n"
+                "**Finding ID:** `pipeline:evaluation:evaluate:test:failure`\n"
+                "**Severity:** critical\n"
+                "**Correlation:** hc-123-1\n"
+                "**Executive Summary:** Tests failed."
+            ),
+        )
+        self.assertFalse(incomplete["ok"])
+        self.assertIn("Investigation report template is incomplete", incomplete["error"])
+        self.assertEqual(incomplete["calls"], [])
+
+        unsafe_report = (
+            "## 🔍 Investigation: Evaluation tests failed\n\n"
+            "**Finding ID:** `pipeline:evaluation:evaluate:test:failure`\n"
+            "**Severity:** critical\n"
+            "**Correlation:** hc-123-1\n"
+            "**Executive Summary:** Tests failed.\n\n"
+            "### Root Cause\nA deterministic failure was confirmed.\n\n"
+            "**Confidence:** High — the assertion identifies the cause.\n\n"
+            "### Blast Radius\nThe evaluation workflow is affected.\n\n"
+            "### Suggested Fix\n1. Correct the test setup.\n\n"
+            "### Remediation Status\nReport-only. A maintainer should fix it.\n\n"
+            "**Validation:** Run the targeted test.\n"
+            "**Owner:** Evaluation maintainers\n\n"
+            "### Evidence\nThe workflow output confirms the failure.\n\n"
+            "### Related\n[details](//attacker.example/path)"
+        )
+        unsafe = run_investigation_publisher(
+            self,
+            report_body=unsafe_report,
+        )
+        self.assertFalse(unsafe["ok"])
+        self.assertIn("Protocol-relative links are not allowed", unsafe["error"])
+        self.assertEqual(
+            [call["type"] for call in unsafe["calls"]],
+            ["get-run"],
+        )
 
     def test_devops_health_investigator_has_no_mutating_tools(self) -> None:
         workflows = REPO_ROOT / ".github" / "workflows"
