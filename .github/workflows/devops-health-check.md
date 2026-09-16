@@ -169,7 +169,10 @@ safe-outputs:
               const validDate = value =>
                 typeof value === "string" &&
                 /^\d{4}-\d{2}-\d{2}$/.test(value) &&
-                !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+                !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
+                new Date(`${value}T00:00:00Z`)
+                  .toISOString()
+                  .slice(0, 10) === value;
               const validNonNegativeNumber = value =>
                 typeof value === "number" &&
                 Number.isFinite(value) &&
@@ -356,6 +359,7 @@ safe-outputs:
               };
               const tableRows = new Map();
               const correlationIds = new Set();
+              const doneRows = [];
               for (const line of investigationSection[1].split("\n")) {
                 const match = line.match(
                   /^\| `([^`]+)` \| ([^|]*) \| ([^|]*) \| (⏳ Pending|🔄 Dispatched|✅ Done) \| ([^|]*) \| (.*) \|$/
@@ -380,11 +384,16 @@ safe-outputs:
                   /<!-- correlation:(hc-[1-9][0-9]*-[1-9][0-9]*) -->/
                 );
                 if (
+                  correlationMatch &&
+                  correlationIds.has(correlationMatch[1])
+                ) {
+                  throw new Error(`Duplicate row correlation for ${id}`);
+                }
+                if (
                   status === "⏳ Pending" &&
                   (
                     !correlationMatch ||
-                    (result.match(/<!-- correlation:/g) || []).length !== 1 ||
-                    correlationIds.has(correlationMatch[1])
+                    (result.match(/<!-- correlation:/g) || []).length !== 1
                   )
                 ) {
                   throw new Error(`Pending row has invalid correlation for ${id}`);
@@ -392,11 +401,72 @@ safe-outputs:
                 if (correlationMatch) {
                   correlationIds.add(correlationMatch[1]);
                 }
+                if (status === "✅ Done") {
+                  const escapedOwner = context.repo.owner.replace(
+                    /[.*+?^${}()|[\]\\]/g,
+                    "\\$&"
+                  );
+                  const escapedRepo = context.repo.repo.replace(
+                    /[.*+?^${}()|[\]\\]/g,
+                    "\\$&"
+                  );
+                  const doneResult = result.match(
+                    new RegExp(
+                      "^\\[[^\\]\\r\\n]{1,512}\\]\\(" +
+                        `https://github\\.com/${escapedOwner}/${escapedRepo}` +
+                        "/issues/695#issuecomment-([1-9][0-9]*)\\) " +
+                        "<!-- correlation:(hc-[1-9][0-9]*-[1-9][0-9]*) -->$"
+                    )
+                  );
+                  if (
+                    !doneResult ||
+                    doneResult[2] !== correlationMatch?.[1]
+                  ) {
+                    throw new Error(`Done row has invalid result for ${id}`);
+                  }
+                  doneRows.push({
+                    finding_id: id,
+                    correlation_id: doneResult[2],
+                    comment_id: Number(doneResult[1]),
+                  });
+                }
                 tableRows.set(id, {
                   status,
                   line,
                   correlation_id: correlationMatch?.[1],
                 });
+              }
+              for (const doneRow of doneRows) {
+                const { data: comment } = await github.rest.issues.getComment({
+                  ...context.repo,
+                  comment_id: doneRow.comment_id,
+                });
+                if (
+                  comment.user?.login !== "github-actions[bot]" ||
+                  comment.issue_url !==
+                    `https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}/issues/695` ||
+                  comment.html_url !==
+                    `https://github.com/${context.repo.owner}/${context.repo.repo}/issues/695#issuecomment-${doneRow.comment_id}` ||
+                  !comment.body?.match(
+                    new RegExp(
+                      `^\\*\\*Finding ID:\\*\\* \`${doneRow.finding_id.replace(
+                        /[.*+?^${}()|[\]\\]/g,
+                        "\\$&"
+                      )}\`\\s*$`,
+                      "m"
+                    )
+                  ) ||
+                  !comment.body?.match(
+                    new RegExp(
+                      `^\\*\\*Correlation:\\*\\* ${doneRow.correlation_id}\\s*$`,
+                      "m"
+                    )
+                  )
+                ) {
+                  throw new Error(
+                    `Done row comment verification failed for ${doneRow.finding_id}`
+                  );
+                }
               }
               const qualifiesForInvestigation = finding =>
                 finding.severity === "critical" ||

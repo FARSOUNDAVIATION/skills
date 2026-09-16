@@ -145,7 +145,7 @@ any resource, enforce all of these rules:
    the finding fingerprint. Do not fetch a resource merely because an input
    points to it.
 9. `correlation_id` matches
-   `hc-{YYYY-MM-DD}-{numeric_health_run_id}-{numeric_sequence}`.
+   `hc-{numeric_health_run_id}-{numeric_sequence}`.
 
 After the structural checks, fetch only the trusted GitHub metadata or
 repository configuration needed to recompute the finding. Do not fetch

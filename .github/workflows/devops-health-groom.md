@@ -210,9 +210,18 @@ For each row in the existing Investigation Results table:
 3. If a matching investigation comment exists:
    - Change the Investigation column from `⏳ Pending` or `🔄 Dispatched` to
      `✅ Done`
-   - Replace the Result cell with `[{executive_summary}]({comment_url})`
+   - Replace the Result cell with
+     `[{executive_summary}]({comment_url}) <!-- correlation:{correlation_id} -->`
    - Preserve the First Seen date from the existing row
-4. If no matching investigation comment exists yet, leave the row unchanged.
+4. For an existing `✅ Done` row, fetch the exact issue comment referenced by
+   its Result URL and require all of these before preserving or rendering it:
+   - the URL is a comment on issue `695` in the current repository;
+   - the author is `github-actions[bot]`;
+   - the comment's exact Finding ID and correlation match the row.
+   If any check fails, call `noop` with a validation error and preserve the
+   dashboard unchanged.
+5. If no matching investigation comment exists yet, leave a pending row
+   unchanged.
 
 **If the Investigation Results section does NOT exist** in the issue body:
 
@@ -287,7 +296,7 @@ The `body` field must contain **only** the Investigation Results island — star
 
 | Finding ID | Finding | Severity | Investigation | First Seen | Result |
 |------------|---------|----------|---------------|------------|--------|
-| `infra:no-codeowners` | CODEOWNERS file is missing | 🟡 Warning | ✅ Done | 2026-05-09 | [summary](url) |
+| `infra:no-codeowners` | CODEOWNERS file is missing | 🟡 Warning | ✅ Done | 2026-05-09 | [summary](https://github.com/dotnet/skills/issues/695#issuecomment-123) <!-- correlation:hc-456-1 --> |
 ```
 
 Only call `update-issue` if at least one change was made across Steps 3 and 4. If nothing changed, skip the call.
@@ -325,6 +334,10 @@ If changes were made, the summary is implicit in the safe-output calls. Do NOT c
 - **Create missing sections**: If the issue body doesn't contain a `## 🔍 Investigation Results` section, **create it** from investigation comments (see Step 3). Do NOT silently skip linking — this is the groomer's primary job. Only skip Step 3 if there are zero investigation comments to link. When creating a missing section, use `operation: "replace-island"` — this will insert the section at the appropriate location.
 - **Prune resolved rows**: Rows for findings that are no longer in the active fingerprint set (i.e. resolved) must be **removed** from the Investigation Results table entirely. The table should only show active investigations (⏳ Pending, 🔄 Dispatched, ✅ Done for still-active findings). Historical investigation results remain accessible via the issue's comment history.
 - **Column schema**: The Investigation Results table MUST use the header `| Finding ID | Finding | Severity | Investigation | First Seen | Result |`. Correlate and de-duplicate by Finding ID, then require the row correlation to match the investigation comment before linking a result. For a legacy row without an ID or correlation, migrate it only when its title uniquely matches one active state finding and one investigation comment; otherwise retain it unlinked or drop the ambiguous row. Map old `Status` to `Investigation`, and populate missing `First Seen` from the authoritative state or the investigation comment's `created_at` date.
+- **Validate completed rows**: Never trust a `✅ Done` status or Result URL from
+  dashboard text alone. Fetch the referenced comment and verify repository,
+  issue `695`, `github-actions[bot]` authorship, Finding ID, and correlation
+  before preserving the row.
 - **No shell or intermediate files**: Do all work through GitHub and safe-output
   tools. Hold parsed data and the issue body in memory.
 - **Use MCP `issue_read` for fetching comments**: Use the GitHub MCP `issue_read` tool with `method: get_comments` for fetching issue comments. If the response includes a `[Filtered]` notice, continue working with the comments that were returned — filtered items are from non-bot authors and are irrelevant to grooming. Do NOT call `report_incomplete` or `missing_tool` because of filtered items.

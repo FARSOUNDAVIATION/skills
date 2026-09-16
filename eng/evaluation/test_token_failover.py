@@ -180,6 +180,16 @@ const github = {{
         }}
         return {{ data: {{}} }};
       }},
+      getComment: async args => {{
+        calls.push({{ type: "get-comment", args }});
+        const comment = {existing_comments_json}.find(
+          candidate => candidate.id === args.comment_id
+        );
+        if (!comment) {{
+          throw new Error(`comment ${{args.comment_id}} not found`);
+        }}
+        return {{ data: comment }};
+      }},
       listComments: async args => {{
         calls.push({{ type: "list-comments", args }});
         return {{ data: {existing_comments_json} }};
@@ -411,6 +421,9 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Dashboard state root schema is invalid", publisher_script)
         self.assertIn("Dashboard active finding schema is invalid", publisher_script)
         self.assertIn("Dashboard history schema is invalid", publisher_script)
+        self.assertIn(".toISOString()", publisher_script)
+        self.assertIn("github.rest.issues.getComment", publisher_script)
+        self.assertIn("Done row comment verification failed", publisher_script)
         self.assertIn(
             "(dashboardBody.match(/<!-- devops-health-state:v1/g) || []).length !== 1",
             publisher_script,
@@ -582,6 +595,7 @@ class TokenFailoverTests(unittest.TestCase):
             "both its exact `finding_id` and `correlation_id` match",
             normalized_groom,
         )
+        self.assertIn("Validate completed rows", groom)
         self.assertIn("⏳ Pending", health_check)
         self.assertIn(
             "Pending rows remain eligible",
@@ -699,6 +713,118 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("Dashboard active finding schema is invalid", result["error"])
         self.assertEqual(result["calls"], [])
+
+        invalid_date_finding = {
+            **duplicate_finding,
+            "first_seen": "2026-09-31",
+        }
+        invalid_date_body = f"""# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+| `infra:no-codeowners` | Missing CODEOWNERS | 🟡 Warning | ⏳ Pending | 2026-09-31 | ⏳ Awaiting investigation result <!-- correlation:hc-90-1 --> |
+
+<!-- devops-health-state:v1
+{json.dumps({"active_findings": [invalid_date_finding], "history": []}, separators=(",", ":"))}
+-->
+"""
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": invalid_date_body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": json.dumps(
+                    [
+                        {
+                            "finding_id": "infra:no-codeowners",
+                            "finding_type": "infra",
+                            "finding_title": "Missing CODEOWNERS",
+                            "finding_severity": "warning",
+                            "resource_url": "https://github.com/dotnet/skills",
+                            "correlation_id": "hc-90-1",
+                        }
+                    ]
+                ),
+            },
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("Dashboard active finding schema is invalid", result["error"])
+        self.assertEqual(result["calls"], [])
+
+    def test_devops_health_publisher_verifies_done_row_comment(self) -> None:
+        finding = {
+            "fingerprint": "pipeline:evaluation:evaluate:test:failure",
+            "title": "Evaluation tests failed",
+            "severity": "critical",
+            "category": "pipeline",
+            "url": "https://github.com/dotnet/skills/actions/runs/45",
+            "first_seen": "2026-09-16",
+            "occurrences": 1,
+        }
+        correlation = "hc-91-1"
+        comment_id = 123
+        body = f"""# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+| `{finding["fingerprint"]}` | {finding["title"]} | 🔴 Critical | ✅ Done | 2026-09-16 | [Tests were fixed](https://github.com/dotnet/skills/issues/695#issuecomment-{comment_id}) <!-- correlation:{correlation} --> |
+
+<!-- devops-health-state:v1
+{json.dumps({"active_findings": [finding], "history": []}, separators=(",", ":"))}
+-->
+"""
+        comment = {
+            "id": comment_id,
+            "user": {"login": "github-actions[bot]"},
+            "issue_url": "https://api.github.com/repos/dotnet/skills/issues/695",
+            "html_url": (
+                "https://github.com/dotnet/skills/issues/695"
+                f"#issuecomment-{comment_id}"
+            ),
+            "body": (
+                f"**Finding ID:** `{finding['fingerprint']}`\n"
+                f"**Correlation:** {correlation}"
+            ),
+        }
+        item = {
+            "expected_updated_at": "2026-09-16T10:00:00Z",
+            "dashboard_body": body,
+            "daily_comment": "## 📋 Health Check — 2026-09-16",
+            "dispatches_json": "[]",
+        }
+
+        valid = run_health_publisher(
+            self,
+            item,
+            existing_comments=[comment],
+        )
+        self.assertTrue(valid["ok"])
+        self.assertEqual(
+            [call["type"] for call in valid["calls"]],
+            ["get-comment", "get", "update", "repo", "comment"],
+        )
+
+        fabricated = run_health_publisher(
+            self,
+            item,
+            existing_comments=[
+                {
+                    **comment,
+                    "user": {"login": "untrusted-user"},
+                }
+            ],
+        )
+        self.assertFalse(fabricated["ok"])
+        self.assertIn("Done row comment verification failed", fabricated["error"])
+        self.assertEqual(
+            [call["type"] for call in fabricated["calls"]],
+            ["get-comment"],
+        )
 
     def test_devops_health_publisher_preserves_pending_dispatches(self) -> None:
         findings = [
@@ -1032,7 +1158,7 @@ class TokenFailoverTests(unittest.TestCase):
             },
         )
         self.assertFalse(result["ok"])
-        self.assertIn("Pending row has invalid correlation", result["error"])
+        self.assertIn("Duplicate row correlation", result["error"])
         self.assertEqual(result["calls"], [])
 
     def test_devops_health_publisher_reconciles_accepted_dispatch(self) -> None:
@@ -1345,6 +1471,11 @@ class TokenFailoverTests(unittest.TestCase):
             normalized_investigate,
         )
         self.assertIn("pages-build-deployment", investigate)
+        self.assertIn(
+            "`hc-{numeric_health_run_id}-{numeric_sequence}`",
+            investigate,
+        )
+        self.assertNotIn("hc-{YYYY-MM-DD}", investigate)
         self.assertIn("bounded `list_commits` and `get_commit`", investigate)
         self.assertIn("searching for the exact suspect commit SHA", investigate)
         investigate_knowledge = (
