@@ -1,12 +1,12 @@
 ---
 name: "DevOps Health — Deep Investigation"
-run-name: "DevOps Health Investigation · ${{ inputs.correlation_id }}"
 description: >
   Worker agent that performs deep root-cause analysis on a single
   health check finding (pipeline, infrastructure, or resource).
   Dispatched by the health check orchestrator. It reports evidence,
   root cause, blast radius, and a proposed remediation without modifying
   repository files or executing repository code.
+run-name: "DevOps Health Investigation — ${{ inputs.correlation_id }}"
 
 on:
   permissions: {}
