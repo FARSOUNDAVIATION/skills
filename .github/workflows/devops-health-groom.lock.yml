@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"1cf4c454441fb59d4eecaf7d19810e98c18301522797336a0983b5d1fb9d316b","body_hash":"45007ae913958510175fff99a09cbb3055ba574f2b1ec2d240c0801e98a8db9b","compiler_version":"v0.88.7","strict":true,"agent_id":"copilot","agent_model":"${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'gpt-5.6-sol' }}","engine_versions":{"copilot":"1.0.80"}}
-# gh-aw-manifest: {"version":1,"secrets":["COPILOT_PAT_0","COPILOT_PAT_1","COPILOT_PAT_2","COPILOT_PAT_3","COPILOT_PAT_4","COPILOT_PAT_5","COPILOT_PAT_6","COPILOT_PAT_7","COPILOT_PAT_8","COPILOT_PAT_9","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"},{"repo":"github/gh-aw-actions/setup","sha":"5e508589e03a7757a7e05b26e834292f5445bfb6","version":"v0.88.7"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14","digest":"sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14@sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14","digest":"sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14@sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14","digest":"sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14@sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.18","digest":"sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.18@sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d","pinned_image":"ghcr.io/github/gh-aw-node@sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d"},{"image":"ghcr.io/github/github-mcp-server:v1.11.0","digest":"sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699","pinned_image":"ghcr.io/github/github-mcp-server:v1.11.0@sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699"}],"mcp_servers":[{"name":"github","tools":["actions_get","actions_list","get_commit","get_file_contents","get_job_logs","get_latest_release","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_releases","list_starred_repositories","list_tags","search_code","search_issues","search_repositories"]},{"name":"safeoutputs","tools":["missing_data","missing_tool","noop","update_issue"]}]}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"314ec0f1dcca8ff67df89d1a2d11fd252239dbf986c2b780f6f39f2ab8be9f83","body_hash":"02c08b31470c61f5530103e09ca254561588532af21b07a527f8f4266d56b1e5","compiler_version":"v0.88.7","strict":true,"agent_id":"copilot","agent_model":"${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'gpt-5.6-sol' }}","engine_versions":{"copilot":"1.0.80"}}
+# gh-aw-manifest: {"version":1,"secrets":["COPILOT_PAT_0","COPILOT_PAT_1","COPILOT_PAT_2","COPILOT_PAT_3","COPILOT_PAT_4","COPILOT_PAT_5","COPILOT_PAT_6","COPILOT_PAT_7","COPILOT_PAT_8","COPILOT_PAT_9","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"},{"repo":"github/gh-aw-actions/setup","sha":"5e508589e03a7757a7e05b26e834292f5445bfb6","version":"v0.88.7"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14","digest":"sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14@sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14","digest":"sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14@sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14","digest":"sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14@sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.18","digest":"sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.18@sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d","pinned_image":"ghcr.io/github/gh-aw-node@sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d"},{"image":"ghcr.io/github/github-mcp-server:v1.11.0","digest":"sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699","pinned_image":"ghcr.io/github/github-mcp-server:v1.11.0@sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699"}],"mcp_servers":[{"name":"github","tools":["actions_get","actions_list","get_commit","get_file_contents","get_job_logs","get_latest_release","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_releases","list_starred_repositories","list_tags","search_code","search_issues","search_repositories"]},{"name":"safeoutputs","tools":["missing_data","missing_tool","noop","publish_groomed_dashboard"]}]}
 # This file was automatically generated by gh-aw (v0.88.7). DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -290,7 +290,7 @@ jobs:
           GH_AW_GITHUB_RUN_ID: ${{ github.run_id }}
           GH_AW_GITHUB_WORKSPACE: ${{ github.workspace }}
           GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: update_issue, missing_tool, missing_data, noop\n"
+          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: missing_tool, missing_data, noop, publish_groomed_dashboard\n"
           GH_AW_PROMPT_CONTENT_0002: "</safe-output-tools>\n"
           GH_AW_PROMPT_CONTENT_0003: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_802A9F6A__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_1A3A194A__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_463A214A__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_FF1D34CE__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
           GH_AW_PROMPT_CONTENT_0004: "</system>\n"
@@ -564,7 +564,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"},\"update_issue\":{\"allow_body\":true,\"max\":1,\"target\":\"695\"}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"},\"publish-groomed-dashboard\":{\"description\":\"Replace only the validated investigation-results section\",\"inputs\":{\"rows_json\":{\"default\":null,\"description\":\"Investigation rows as one exact fenced JSON block\",\"required\":true,\"type\":\"string\"}}}}"
         with:
           script: |
             const path = require('path');
@@ -577,11 +577,27 @@ jobs:
         env:
           GH_AW_TOOLS_META_JSON: |
             {
-              "description_suffixes": {
-                "update_issue": " CONSTRAINTS: Maximum 1 issue(s) can be updated. Target: 695."
-              },
+              "description_suffixes": {},
               "repo_params": {},
-              "dynamic_tools": []
+              "dynamic_tools": [
+                {
+                  "description": "Replace only the validated investigation-results section",
+                  "inputSchema": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "rows_json": {
+                        "description": "Investigation rows as one exact fenced JSON block",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "rows_json"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "publish_groomed_dashboard"
+                }
+              ]
             }
           GH_AW_VALIDATION_JSON: |
             {
@@ -641,57 +657,6 @@ jobs:
                     "maxLength": 65000
                   }
                 }
-              },
-              "update_issue": {
-                "defaultMax": 1,
-                "fields": {
-                  "assignees": {
-                    "type": "array",
-                    "itemType": "string",
-                    "itemSanitize": true,
-                    "itemMaxLength": 39
-                  },
-                  "body": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 65000
-                  },
-                  "issue_number": {
-                    "issueOrPRNumber": true
-                  },
-                  "labels": {
-                    "type": "array"
-                  },
-                  "milestone": {
-                    "optionalPositiveInteger": true
-                  },
-                  "operation": {
-                    "type": "string",
-                    "enum": [
-                      "replace",
-                      "append",
-                      "prepend",
-                      "replace-island"
-                    ]
-                  },
-                  "repo": {
-                    "type": "string",
-                    "maxLength": 256
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "open",
-                      "closed"
-                    ]
-                  },
-                  "title": {
-                    "type": "string",
-                    "sanitize": true,
-                    "maxLength": 128
-                  }
-                },
-                "customValidation": "requiresOneOf:status,title,body,labels,assignees,milestone"
               }
             }
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
@@ -1149,6 +1114,7 @@ jobs:
       - agent
       - detection
       - pat_pool
+      - publish_groomed_dashboard
       - safe_outputs
     if: >
       always() && (needs.agent.result != 'skipped' || needs.activation.outputs.lockdown_check_failed == 'true' ||
@@ -1157,7 +1123,7 @@ jobs:
     runs-on: ubuntu-slim
     environment: copilot-pat-pool
     permissions:
-      actions: read
+      actions: write
       issues: write
     concurrency:
       group: "gh-aw-conclusion-devops-health-groom"
@@ -1792,6 +1758,354 @@ jobs:
             const { main } = require(path.join(actionsDir, 'check_membership.cjs'));
             await main();
 
+  publish_groomed_dashboard:
+    needs:
+      - agent
+      - detection
+    if: >
+      (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'publish_groomed_dashboard') &&
+      (needs.agent.result == 'success' && needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' &&
+      contains(needs.agent.outputs.output_types, 'publish_groomed_dashboard'))
+    runs-on: ubuntu-latest
+    environment: copilot-pat-pool
+    permissions:
+      issues: write
+    steps:
+      - name: Download agent output artifact
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: "{agent,agent-output-fallback}"
+          merge-multiple: true
+          path: ${{ runner.temp }}/gh-aw/safe-jobs/
+      - name: Publish groomed investigation rows
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
+        env:
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+          GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
+        with:
+          script: |
+            const fs = require("fs");
+
+            const outputPath = process.env.GH_AW_AGENT_OUTPUT;
+            if (!outputPath) {
+              core.setFailed("GH_AW_AGENT_OUTPUT is not set");
+              return;
+            }
+            const output = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+            const allItems = Array.isArray(output.items) ? output.items : [];
+            const items = allItems.filter(
+              item => item.type === "publish_groomed_dashboard"
+            );
+            if (allItems.length !== 1 || items.length !== 1) {
+              core.setFailed(
+                `Expected publish_groomed_dashboard as the only output item, got ${allItems.length} total`
+              );
+              return;
+            }
+
+            const fenced = items[0].rows_json;
+            const match =
+              typeof fenced === "string" &&
+              /^```json\r?\n([\s\S]*)\r?\n```$/.exec(fenced);
+            if (!match || fenced.length > 100000) {
+              core.setFailed("rows_json must be one bounded fenced JSON block");
+              return;
+            }
+            let rows;
+            try {
+              rows = JSON.parse(match[1]);
+            } catch {
+              core.setFailed("rows_json is not valid JSON");
+              return;
+            }
+            if (!Array.isArray(rows) || rows.length > 100) {
+              core.setFailed("rows_json must contain at most 100 rows");
+              return;
+            }
+
+            const [owner, repo] = process.env.EXPECTED_REPOSITORY.split("/");
+            const issue = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: 695,
+            });
+            const labels = issue.data.labels.map(label =>
+              typeof label === "string" ? label : label.name
+            );
+            if (
+              issue.data.state !== "open" ||
+              issue.data.title !== "🏥 Repository Health Dashboard" ||
+              !labels.includes("devops-health")
+            ) {
+              core.setFailed("Issue 695 failed canonical dashboard validation");
+              return;
+            }
+
+            const body = issue.data.body || "";
+            const stateMatches = [
+              ...body.matchAll(
+                /<!-- devops-health-state:v1\r?\n([\s\S]*?)\r?\n-->/g
+              ),
+            ];
+            if (stateMatches.length !== 1) {
+              core.setFailed("Dashboard body must contain one valid state marker");
+              return;
+            }
+            let state;
+            try {
+              state = JSON.parse(stateMatches[0][1]);
+            } catch {
+              core.setFailed("Dashboard state is not valid JSON");
+              return;
+            }
+            if (
+              !state ||
+              !Array.isArray(state.active_findings) ||
+              state.active_findings.length > 100
+            ) {
+              core.setFailed("Dashboard state has an invalid active finding set");
+              return;
+            }
+            const validRepositoryUrl = value => {
+              if (
+                typeof value !== "string" ||
+                value.length > 500 ||
+                /[\s()[\]|<>\\]/.test(value)
+              ) {
+                return false;
+              }
+              try {
+                const url = new URL(value);
+                return (
+                  url.protocol === "https:" &&
+                  url.hostname === "github.com" &&
+                  url.username === "" &&
+                  url.password === "" &&
+                  url.port === "" &&
+                  (
+                    url.pathname === `/${owner}/${repo}` ||
+                    url.pathname.startsWith(`/${owner}/${repo}/`)
+                  )
+                );
+              } catch {
+                return false;
+              }
+            };
+            const active = new Map();
+            for (const finding of state.active_findings) {
+              if (
+                !finding ||
+                typeof finding.fingerprint !== "string" ||
+                typeof finding.title !== "string" ||
+                finding.title.length > 200 ||
+                !["critical", "warning", "info"].includes(finding.severity) ||
+                !/^\d{4}-\d{2}-\d{2}$/.test(finding.first_seen) ||
+                !validRepositoryUrl(finding.url) ||
+                active.has(finding.fingerprint)
+              ) {
+                core.setFailed("Dashboard state contains an invalid active finding");
+                return;
+              }
+              active.set(finding.fingerprint, finding);
+            }
+
+            const exactKeys = (value, keys) =>
+              value !== null &&
+              typeof value === "object" &&
+              !Array.isArray(value) &&
+              JSON.stringify(Object.keys(value).sort()) ===
+                JSON.stringify([...keys].sort());
+            const validCommentUrl = value => {
+              if (
+                typeof value !== "string" ||
+                value.length > 500 ||
+                /[\s()[\]|<>\\]/.test(value)
+              ) {
+                return false;
+              }
+              try {
+                const url = new URL(value);
+                return (
+                  url.protocol === "https:" &&
+                  url.hostname === "github.com" &&
+                  url.username === "" &&
+                  url.password === "" &&
+                  url.port === "" &&
+                  url.pathname === `/${owner}/${repo}/issues/695` &&
+                  url.search === "" &&
+                  /^#issuecomment-\d+$/.test(url.hash)
+                );
+              } catch {
+                return false;
+              }
+            };
+            const escapeCell = value =>
+              value
+                .replace(/\\/g, "\\\\")
+                .replace(/\r\n|\r|\n/g, " ")
+                .replace(/([|[\]()`*_<>&])/g, "\\$1")
+                .replace(/@/g, "&#64;");
+            const encodeMarker = value =>
+              encodeURIComponent(value).replace(
+                /[!'()*]/g,
+                character =>
+                  `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+              );
+            const seen = new Set();
+            const renderedRows = [];
+            for (const row of rows) {
+              if (
+                !exactKeys(row, [
+                  "correlation_id",
+                  "fingerprint",
+                  "result_summary",
+                  "result_url",
+                  "status",
+                ]) ||
+                typeof row.fingerprint !== "string" ||
+                ![
+                  "pending",
+                  "dispatching",
+                  "dispatched",
+                  "done",
+                  "skipped",
+                ].includes(row.status) ||
+                typeof row.correlation_id !== "string" ||
+                typeof row.result_summary !== "string" ||
+                row.result_summary.length > 300 ||
+                typeof row.result_url !== "string" ||
+                seen.has(row.fingerprint)
+              ) {
+                core.setFailed("A groomed row failed schema validation");
+                return;
+              }
+              const finding = active.get(row.fingerprint);
+              if (!finding) {
+                core.setFailed("A groomed row is not active in dashboard state");
+                return;
+              }
+              if (
+                row.status === "done" &&
+                (
+                  row.result_summary.length === 0 ||
+                  !validCommentUrl(row.result_url)
+                )
+              ) {
+                core.setFailed("A completed groomed row has an invalid result");
+                return;
+              }
+              if (
+                row.status !== "done" &&
+                (row.result_summary !== "" || row.result_url !== "")
+              ) {
+                core.setFailed("An incomplete groomed row contains result data");
+                return;
+              }
+              const validCorrelation =
+                /^hc-\d{4}-\d{2}-\d{2}-\d+-\d+$/.test(row.correlation_id);
+              if (
+                (row.status === "dispatching" && !validCorrelation) ||
+                (
+                  row.status === "dispatched" &&
+                  row.correlation_id !== "" &&
+                  !validCorrelation
+                ) ||
+                (
+                  !["dispatching", "dispatched"].includes(row.status) &&
+                  row.correlation_id !== ""
+                )
+              ) {
+                core.setFailed("A groomed row has an invalid correlation");
+                return;
+              }
+              const severityEmoji = {
+                critical: "🔴",
+                warning: "🟡",
+                info: "🔵",
+              }[finding.severity];
+              const statusText = {
+                pending: "⏳ Pending — dispatch budget reached",
+                dispatching: "⏳ Dispatch pending",
+                dispatched: "🔄 Dispatched",
+                done: "✅ Done",
+                skipped: "⏳ Skipped",
+              }[row.status];
+              let resultText = "Investigation not dispatched";
+              if (row.status === "pending") {
+                resultText = "Awaiting a later dispatch slot";
+              } else if (row.status === "dispatching") {
+                resultText = "Dispatch will be retried or reconciled";
+              } else if (row.status === "dispatched") {
+                resultText =
+                  `[⏳ Investigation dispatched — results arriving shortly...](${finding.url})`;
+              } else if (row.status === "done") {
+                resultText =
+                  `[${escapeCell(row.result_summary)}](${row.result_url})`;
+              }
+              const correlationMarker = row.correlation_id
+                ? ` [](https://github.com/${owner}/${repo}/issues/695` +
+                  `#investigation-correlation:${row.correlation_id})`
+                : "";
+              renderedRows.push(
+                `| [](https://github.com/${owner}/${repo}/issues/695` +
+                `#investigation-fingerprint:${encodeMarker(row.fingerprint)})` +
+                `${correlationMarker} ${escapeCell(finding.title)} | ` +
+                `${severityEmoji} ${finding.severity} | ${statusText} | ` +
+                `${finding.first_seen} | ${resultText} |`
+              );
+              seen.add(row.fingerprint);
+            }
+
+            const section = [
+              "<!-- gh-aw-island-start:devops-health-groom -->",
+              "## 🔍 Investigation Results",
+              "",
+              "> Deep investigations are dispatched for new critical/warning findings.",
+              "> The [grooming workflow](../workflows/devops-health-groom.md) links results ~3 hours after this run.",
+              "",
+              "| Finding | Severity | Investigation | First Seen | Result |",
+              "|---------|----------|---------------|------------|--------|",
+              ...renderedRows,
+              "<!-- gh-aw-island-end:devops-health-groom -->",
+            ].join("\n");
+
+            let nextBody = body.replace(
+              /<!-- gh-aw-island-start:devops-health-groom -->[\s\S]*?<!-- gh-aw-island-end:devops-health-groom -->\r?\n?/g,
+              ""
+            );
+            nextBody = nextBody.replace(
+              /^## 🔍 Investigation Results[\s\S]*?(?=^## )/gm,
+              ""
+            );
+            nextBody = nextBody.replace(
+              /^## 🔍 Investigation Results[\s\S]*$/m,
+              ""
+            );
+            const insertionPoints = [
+              nextBody.search(/^## ✅ Resolved/m),
+              nextBody.search(/^## 📌 Existing/m),
+              nextBody.search(/^## 📊 Trends/m),
+              nextBody.indexOf("<sub>"),
+            ].filter(index => index >= 0);
+            const insertion = insertionPoints.length
+              ? Math.min(...insertionPoints)
+              : nextBody.length;
+            nextBody =
+              `${nextBody.slice(0, insertion).trimEnd()}\n\n${section}\n\n` +
+              nextBody.slice(insertion).trimStart();
+            if (nextBody.length > 60000) {
+              core.setFailed("Groomed dashboard body exceeds 60000 characters");
+              return;
+            }
+
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number: 695,
+              body: nextBody,
+            });
+
   safe_outputs:
     needs:
       - activation
@@ -1800,8 +2114,7 @@ jobs:
     if: (!cancelled()) && needs.agent.result != 'skipped' && needs.detection.result == 'success'
     runs-on: ubuntu-slim
     environment: copilot-pat-pool
-    permissions:
-      issues: write
+    permissions: {}
     timeout-minutes: 45
     env:
       GH_AW_AGENT_AIC: ${{ needs.agent.outputs.aic }}
@@ -1885,7 +2198,8 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"},\"update_issue\":{\"allow_body\":true,\"max\":1,\"target\":\"695\"}}"
+          GH_AW_SAFE_OUTPUT_JOBS: "{\"publish_groomed_dashboard\":\"\"}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"}}"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
           script: |

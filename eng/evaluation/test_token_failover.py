@@ -29,6 +29,13 @@ GIT_BASH = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git" / "
 BASH = str(GIT_BASH) if os.name == "nt" and GIT_BASH.exists() else "bash"
 
 
+def workflow_frontmatter(text: str) -> dict:
+    match = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|\Z)", text, re.DOTALL)
+    if not match:
+        raise AssertionError("Workflow source does not contain valid frontmatter")
+    return yaml.safe_load(match.group(1))
+
+
 def create_symlink_or_skip(
     test_case: unittest.TestCase,
     link: Path,
@@ -156,7 +163,7 @@ class TokenFailoverTests(unittest.TestCase):
         ):
             with self.subTest(workflow=name):
                 source = REPO_ROOT / ".github" / "workflows" / f"{name}.md"
-                frontmatter = yaml.safe_load(source.read_text(encoding="utf-8").split("---", 2)[1])
+                frontmatter = workflow_frontmatter(source.read_text(encoding="utf-8"))
                 self.assertEqual(
                     frontmatter["model"],
                     "${{ vars.GH_AW_MODEL_AGENT_COPILOT || "
@@ -170,7 +177,7 @@ class TokenFailoverTests(unittest.TestCase):
             encoding="utf-8"
         )
         normalized_health = " ".join(health_check.split())
-        health_frontmatter = yaml.safe_load(health_check.split("---", 2)[1])
+        health_frontmatter = workflow_frontmatter(health_check)
         health_lock_text = (
             workflows / "devops-health-check.lock.yml"
         ).read_text(encoding="utf-8")
@@ -178,7 +185,7 @@ class TokenFailoverTests(unittest.TestCase):
         groom_source = workflows / "devops-health-groom.md"
         groom = groom_source.read_text(encoding="utf-8")
         normalized_groom = " ".join(groom.split())
-        groom_frontmatter = yaml.safe_load(groom.split("---", 2)[1])
+        groom_frontmatter = workflow_frontmatter(groom)
         groom_lock_text = (
             workflows / "devops-health-groom.lock.yml"
         ).read_text(encoding="utf-8")
@@ -327,9 +334,11 @@ class TokenFailoverTests(unittest.TestCase):
             health_lock_text,
         )
         self.assertIn(
-            "investigation-fingerprint:${finding.fingerprint}",
+            "investigation-fingerprint:${encodeMarker(finding.fingerprint)}",
             health_lock_text,
         )
+        self.assertIn("encodeURIComponent(value).replace(", health_lock_text)
+        self.assertIn("/[!'()*]/g", health_lock_text)
         self.assertIn(
             "devops-health-state:v1",
             health_lock_text,
@@ -355,7 +364,11 @@ class TokenFailoverTests(unittest.TestCase):
             health_lock_text,
         )
         self.assertIn(
-            ".replace(rowsToken, () => renderedRows.join",
+            ".replace(rowsToken, () => renderRows(false))",
+            health_lock_text,
+        )
+        self.assertIn(
+            ".replace(rowsToken, () => renderRows(true))",
             health_lock_text,
         )
         self.assertIn(
@@ -365,11 +378,34 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertLess(
             health_lock_text.index(".replace(stateToken, () => stateMarker)"),
             health_lock_text.index(
-                ".replace(rowsToken, () => renderedRows.join"
+                ".replace(rowsToken, () => renderRows(false))"
             ),
         )
         self.assertIn(
-            "A dispatch item lacks a persisted dispatched investigation row",
+            "A dispatch item lacks a matching dispatching outbox row",
+            health_lock_text,
+        )
+        self.assertIn("body: outboxBody", health_lock_text)
+        self.assertIn("body: publishedBody", health_lock_text)
+        self.assertLess(
+            health_lock_text.index("body: outboxBody"),
+            health_lock_text.index(
+                "await github.rest.actions.createWorkflowDispatch"
+            ),
+        )
+        self.assertGreater(
+            health_lock_text.index("body: publishedBody"),
+            health_lock_text.index(
+                "await github.rest.actions.createWorkflowDispatch"
+            ),
+        )
+        self.assertIn(
+            "publish_health_report as the only output item",
+            health_lock_text,
+        )
+        self.assertIn("validResourceUrlForType", health_lock_text)
+        self.assertIn(
+            'url.pathname === `/${owner}/${repo}/issues/695`',
             health_lock_text,
         )
         self.assertIn(
@@ -398,9 +434,15 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertFalse(groom_frontmatter["tools"]["cli-proxy"])
         self.assertFalse(groom_frontmatter["tools"]["edit"])
         self.assertFalse(groom_frontmatter["tools"]["bash"])
-        self.assertEqual(
-            groom_frontmatter["safe-outputs"]["update-issue"]["target"],
-            "695",
+        self.assertNotIn("update-issue", groom_frontmatter["safe-outputs"])
+        groom_job = groom_frontmatter["safe-outputs"]["jobs"][
+            "publish-groomed-dashboard"
+        ]
+        self.assertEqual(groom_job["permissions"], {"issues": "write"})
+        self.assertEqual(set(groom_job["inputs"]), {"rows_json"})
+        self.assertIn(
+            "needs.detection.outputs.detection_success == 'true'",
+            groom_job["if"],
         )
         self.assertFalse(
             groom_frontmatter["safe-outputs"]["report-failure-as-issue"]
@@ -411,10 +453,41 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertNotIn("hide-comment", groom_frontmatter["safe-outputs"])
         groom_configs = generated_safe_output_configs(groom_lock)
         self.assertEqual(len(groom_configs), 2)
+        self.assertIn("publish-groomed-dashboard", groom_configs[0])
+        self.assertNotIn("publish-groomed-dashboard", groom_configs[1])
         for config in groom_configs:
-            self.assertEqual(config["update_issue"]["target"], "695")
+            self.assertNotIn("update_issue", config)
             self.assertNotIn("hide_comment", config)
             self.assertNotIn("create_report_incomplete_issue", config)
+        self.assertIn(
+            "publish_groomed_dashboard as the only output item",
+            groom_lock_text,
+        )
+        self.assertIn(
+            "Issue 695 failed canonical dashboard validation",
+            groom_lock_text,
+        )
+        self.assertIn(
+            "A groomed row is not active in dashboard state",
+            groom_lock_text,
+        )
+        self.assertIn(
+            "url.pathname === `/${owner}/${repo}/issues/695`",
+            groom_lock_text,
+        )
+        self.assertIn(
+            'row.status === "dispatching" && !validCorrelation',
+            groom_lock_text,
+        )
+        self.assertIn(
+            "investigation-fingerprint:${encodeMarker(row.fingerprint)}",
+            groom_lock_text,
+        )
+        self.assertIn(
+            "github.rest.issues.update",
+            groom_lock_text,
+        )
+        self.assertNotIn('"update_issue":', groom_lock_text)
         self.assertNotIn("--allow-all-tools", groom_lock_text)
         self.assertNotIn("--allow-tool write", groom_lock_text)
         self.assertNotIn("shell(yq)", groom_lock_text)
@@ -485,8 +558,8 @@ class TokenFailoverTests(unittest.TestCase):
             normalized_groom,
         )
         self.assertIn(
-            "| [](https://github.com/{owner}/{repo}/issues/695"
-            "#investigation-fingerprint:{finding_id})",
+            "[](https://github.com/{owner}/{repo}/issues/695"
+            "#investigation-fingerprint:{fingerprint})",
             groom,
         )
         self.assertIn("Do not stop after the first page", normalized_groom)
@@ -584,8 +657,8 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Dispatch retry", health_check)
         self.assertIn("DEVOPS_HEALTH_INVESTIGATION_ROWS_SLOT_V1", health_check)
         self.assertIn("DEVOPS_HEALTH_STATE_SLOT_V1", health_check)
-        self.assertIn("replace the pending", health_check)
-        self.assertIn("do not append a second row", health_check)
+        self.assertIn("set the structured row\nto `dispatching`", health_check)
+        self.assertIn("Do not append a\nsecond row", health_check)
         self.assertIn(
             "each qualifying 📌 EXISTING pending retry",
             normalized_health,
@@ -645,7 +718,7 @@ class TokenFailoverTests(unittest.TestCase):
             REPO_ROOT / ".github" / "workflows" / "devops-health-investigate.md"
         )
         investigate = investigate_source.read_text(encoding="utf-8")
-        investigate_frontmatter = yaml.safe_load(investigate.split("---", 2)[1])
+        investigate_frontmatter = workflow_frontmatter(investigate)
         investigate_lock = yaml.safe_load(
             investigate_source.with_suffix(".lock.yml").read_text(
                 encoding="utf-8"
@@ -737,7 +810,7 @@ class TokenFailoverTests(unittest.TestCase):
         investigate_lock = (
             workflows / "devops-health-investigate.lock.yml"
         ).read_text(encoding="utf-8")
-        investigate_frontmatter = yaml.safe_load(investigate.split("---", 2)[1])
+        investigate_frontmatter = workflow_frontmatter(investigate)
 
         self.assertNotIn("args", investigate_frontmatter["engine"])
         self.assertFalse(investigate_frontmatter["tools"]["edit"])

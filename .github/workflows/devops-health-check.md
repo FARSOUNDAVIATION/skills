@@ -92,11 +92,14 @@ safe-outputs:
               }
 
               const output = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-              const items = (output.items || []).filter(
+              const allItems = Array.isArray(output.items) ? output.items : [];
+              const items = allItems.filter(
                 item => item.type === "publish_health_report"
               );
-              if (items.length !== 1) {
-                core.setFailed(`Expected one publish_health_report item, got ${items.length}`);
+              if (allItems.length !== 1 || items.length !== 1) {
+                core.setFailed(
+                  `Expected publish_health_report as the only output item, got ${allItems.length} total`
+                );
                 return;
               }
 
@@ -150,6 +153,48 @@ safe-outputs:
               const [owner, repo] = process.env.EXPECTED_REPOSITORY.split("/");
               const allowedTypes = new Set(["pipeline", "infra", "resource"]);
               const allowedSeverities = new Set(["critical", "warning", "info"]);
+              const dashboard = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: 695,
+              });
+              const repository = await github.rest.repos.get({ owner, repo });
+              const defaultBranch = repository.data.default_branch;
+              const labels = dashboard.data.labels.map(label =>
+                typeof label === "string" ? label : label.name
+              );
+              if (
+                dashboard.data.state !== "open" ||
+                dashboard.data.title !== "🏥 Repository Health Dashboard" ||
+                !labels.includes("devops-health")
+              ) {
+                core.setFailed("Issue 695 failed canonical dashboard validation");
+                return;
+              }
+              if (typeof defaultBranch !== "string" || defaultBranch.length === 0) {
+                core.setFailed("Repository default branch is unavailable");
+                return;
+              }
+              const priorOutbox = new Map();
+              for (const line of (dashboard.data.body || "").split(/\r?\n/)) {
+                const fingerprintMatch = line.match(
+                  /#investigation-fingerprint:([^)]*)\)/
+                );
+                const correlationMatch = line.match(
+                  /#investigation-correlation:(hc-\d{4}-\d{2}-\d{2}-\d+-\d+)\)/
+                );
+                if (fingerprintMatch && correlationMatch) {
+                  try {
+                    priorOutbox.set(
+                      decodeURIComponent(fingerprintMatch[1]),
+                      correlationMatch[1]
+                    );
+                  } catch {
+                    core.setFailed("Dashboard contains an invalid outbox marker");
+                    return;
+                  }
+                }
+              }
               const exactKeys = (value, keys) =>
                 value !== null &&
                 typeof value === "object" &&
@@ -193,11 +238,31 @@ safe-outputs:
                 }
                 const url = new URL(value);
                 return (
-                  new RegExp(`^/${owner}/${repo}/issues/\\d+$`).test(
-                    url.pathname
-                  ) &&
+                  url.pathname === `/${owner}/${repo}/issues/695` &&
                   url.search === "" &&
                   /^#issuecomment-\d+$/.test(url.hash)
+                );
+              };
+              const validResourceUrlForType = (value, findingType) => {
+                if (!validRepositoryUrl(value)) {
+                  return false;
+                }
+                const url = new URL(value);
+                if (url.search !== "") {
+                  return false;
+                }
+                const root = `/${owner}/${repo}`;
+                if (findingType === "pipeline") {
+                  return (
+                    new RegExp(`^${root}/actions/runs/\\d+$`).test(url.pathname) &&
+                    url.hash === ""
+                  );
+                }
+                return (
+                  url.pathname === root ||
+                  new RegExp(
+                    `^${root}/(actions/runs/\\d+|commit/[0-9a-fA-F]+|pull/\\d+|issues/\\d+|blob/.+|tree/.+)$`
+                  ).test(url.pathname)
                 );
               };
               const validFingerprint = value => {
@@ -382,19 +447,33 @@ safe-outputs:
                   .replace(/\r\n|\r|\n/g, " ")
                   .replace(/([|[\]()`*_<>&])/g, "\\$1")
                   .replace(/@/g, "&#64;");
+              const encodeMarker = value =>
+                encodeURIComponent(value).replace(
+                  /[!'()*]/g,
+                  character =>
+                    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+                );
               const seenRows = new Set();
-              const rowStatusByFingerprint = new Map();
-              const renderedRows = [];
+              const rowByFingerprint = new Map();
+              const validatedRows = [];
               for (const row of investigationRows) {
                 if (
                   !exactKeys(row, [
+                    "correlation_id",
                     "fingerprint",
                     "result_summary",
                     "result_url",
                     "status",
                   ]) ||
                   !validFingerprint(row.fingerprint) ||
-                  !["pending", "dispatched", "done", "skipped"].includes(row.status) ||
+                  ![
+                    "pending",
+                    "dispatching",
+                    "dispatched",
+                    "done",
+                    "skipped",
+                  ].includes(row.status) ||
+                  typeof row.correlation_id !== "string" ||
                   typeof row.result_summary !== "string" ||
                   row.result_summary.length > 300 ||
                   typeof row.result_url !== "string" ||
@@ -410,6 +489,23 @@ safe-outputs:
                 const finding = stateFindings.get(row.fingerprint);
                 if (!finding) {
                   core.setFailed("An investigation row is not active in persisted state");
+                  return;
+                }
+                const validCorrelation =
+                  /^hc-\d{4}-\d{2}-\d{2}-\d+-\d+$/.test(row.correlation_id);
+                if (
+                  (row.status === "dispatching" && !validCorrelation) ||
+                  (
+                    row.status === "dispatched" &&
+                    row.correlation_id !== "" &&
+                    !validCorrelation
+                  ) ||
+                  (
+                    !["dispatching", "dispatched"].includes(row.status) &&
+                    row.correlation_id !== ""
+                  )
+                ) {
+                  core.setFailed("An investigation row has an invalid correlation");
                   return;
                 }
                 if (
@@ -429,35 +525,9 @@ safe-outputs:
                   core.setFailed("An incomplete investigation row contains result data");
                   return;
                 }
-                const severityEmoji = {
-                  critical: "🔴",
-                  warning: "🟡",
-                  info: "🔵",
-                }[finding.severity];
-                const statusText = {
-                  pending: "⏳ Pending — dispatch budget reached",
-                  dispatched: "🔄 Dispatched",
-                  done: "✅ Done",
-                  skipped: "⏳ Skipped",
-                }[row.status];
-                let resultText = "Investigation not dispatched";
-                if (row.status === "pending") {
-                  resultText = "Awaiting a later dispatch slot";
-                } else if (row.status === "dispatched") {
-                  resultText =
-                    `[⏳ Investigation dispatched — results arriving shortly...](${finding.url})`;
-                } else if (row.status === "done") {
-                  resultText =
-                    `[${escapeCell(row.result_summary)}](${row.result_url})`;
-                }
-                renderedRows.push(
-                  `| [](https://github.com/${owner}/${repo}/issues/695` +
-                  `#investigation-fingerprint:${finding.fingerprint}) ` +
-                  `${escapeCell(finding.title)} | ${severityEmoji} ${finding.severity} | ` +
-                  `${statusText} | ${finding.first_seen} | ${resultText} |`
-                );
                 seenRows.add(row.fingerprint);
-                rowStatusByFingerprint.set(row.fingerprint, row.status);
+                rowByFingerprint.set(row.fingerprint, row);
+                validatedRows.push({ finding, row });
               }
 
               let dispatches;
@@ -503,12 +573,19 @@ safe-outputs:
                   dispatch.finding_title.length === 0 ||
                   dispatch.finding_title.length > 200 ||
                   typeof dispatch.correlation_id !== "string" ||
-                  !new RegExp(
-                    `^hc-\\d{4}-\\d{2}-\\d{2}-${context.runId}-\\d+$`
-                  ).test(dispatch.correlation_id) ||
+                  !(
+                    new RegExp(
+                      `^hc-\\d{4}-\\d{2}-\\d{2}-${context.runId}-\\d+$`
+                    ).test(dispatch.correlation_id) ||
+                    priorOutbox.get(dispatch.finding_id) ===
+                      dispatch.correlation_id
+                  ) ||
                   correlations.has(dispatch.correlation_id) ||
                   dispatchedFindings.has(dispatch.finding_id) ||
-                  !validRepositoryUrl(dispatch.resource_url)
+                  !validResourceUrlForType(
+                    dispatch.resource_url,
+                    dispatch.finding_type
+                  )
                 ) {
                   core.setFailed("A dispatch item failed field validation");
                   return;
@@ -528,13 +605,65 @@ safe-outputs:
                 dispatchedFindings.add(dispatch.finding_id);
               }
               for (const findingId of dispatchedFindings) {
-                if (rowStatusByFingerprint.get(findingId) !== "dispatched") {
+                const row = rowByFingerprint.get(findingId);
+                const dispatch = dispatches.find(
+                  candidate => candidate.finding_id === findingId
+                );
+                if (
+                  row?.status !== "dispatching" ||
+                  row.correlation_id !== dispatch.correlation_id
+                ) {
                   core.setFailed(
-                    "A dispatch item lacks a persisted dispatched investigation row"
+                    "A dispatch item lacks a matching dispatching outbox row"
                   );
                   return;
                 }
               }
+
+              const renderRows = finalizeDispatches =>
+                validatedRows.map(({ finding, row }) => {
+                  const effectiveStatus =
+                    finalizeDispatches &&
+                    row.status === "dispatching" &&
+                    dispatchedFindings.has(row.fingerprint)
+                      ? "dispatched"
+                      : row.status;
+                  const severityEmoji = {
+                    critical: "🔴",
+                    warning: "🟡",
+                    info: "🔵",
+                  }[finding.severity];
+                  const statusText = {
+                    pending: "⏳ Pending — dispatch budget reached",
+                    dispatching: "⏳ Dispatch pending",
+                    dispatched: "🔄 Dispatched",
+                    done: "✅ Done",
+                    skipped: "⏳ Skipped",
+                  }[effectiveStatus];
+                  let resultText = "Investigation not dispatched";
+                  if (effectiveStatus === "pending") {
+                    resultText = "Awaiting a later dispatch slot";
+                  } else if (effectiveStatus === "dispatching") {
+                    resultText = "Dispatch will be retried or reconciled";
+                  } else if (effectiveStatus === "dispatched") {
+                    resultText =
+                      `[⏳ Investigation dispatched — results arriving shortly...](${finding.url})`;
+                  } else if (effectiveStatus === "done") {
+                    resultText =
+                      `[${escapeCell(row.result_summary)}](${row.result_url})`;
+                  }
+                  const correlationMarker = row.correlation_id
+                    ? ` [](https://github.com/${owner}/${repo}/issues/695` +
+                      `#investigation-correlation:${row.correlation_id})`
+                    : "";
+                  return (
+                    `| [](https://github.com/${owner}/${repo}/issues/695` +
+                    `#investigation-fingerprint:${encodeMarker(finding.fingerprint)})` +
+                    `${correlationMarker} ${escapeCell(finding.title)} | ` +
+                    `${severityEmoji} ${finding.severity} | ${statusText} | ` +
+                    `${finding.first_seen} | ${resultText} |`
+                  );
+                }).join("\n");
 
               const serializedState = JSON.stringify(state);
               if (
@@ -550,34 +679,14 @@ safe-outputs:
               }
               const stateMarker =
                 `<!-- devops-health-state:v1\n${serializedState}\n-->`;
+              const outboxBody = item.body
+                .replace(stateToken, () => stateMarker)
+                .replace(rowsToken, () => renderRows(false));
               const publishedBody = item.body
                 .replace(stateToken, () => stateMarker)
-                .replace(rowsToken, () => renderedRows.join("\n"));
-              if (publishedBody.length > 60000) {
+                .replace(rowsToken, () => renderRows(true));
+              if (outboxBody.length > 60000 || publishedBody.length > 60000) {
                 core.setFailed("Rendered dashboard body exceeds 60000 characters");
-                return;
-              }
-
-              const dashboard = await github.rest.issues.get({
-                owner,
-                repo,
-                issue_number: 695,
-              });
-              const repository = await github.rest.repos.get({ owner, repo });
-              const defaultBranch = repository.data.default_branch;
-              const labels = dashboard.data.labels.map(label =>
-                typeof label === "string" ? label : label.name
-              );
-              if (
-                dashboard.data.state !== "open" ||
-                dashboard.data.title !== "🏥 Repository Health Dashboard" ||
-                !labels.includes("devops-health")
-              ) {
-                core.setFailed("Issue 695 failed canonical dashboard validation");
-                return;
-              }
-              if (typeof defaultBranch !== "string" || defaultBranch.length === 0) {
-                core.setFailed("Repository default branch is unavailable");
                 return;
               }
 
@@ -587,7 +696,7 @@ safe-outputs:
                 owner,
                 repo,
                 issue_number: 695,
-                body: publishedBody,
+                body: outboxBody,
               });
 
               for (const dispatch of dispatches) {
@@ -614,6 +723,13 @@ safe-outputs:
                   });
                 }
               }
+
+              await github.rest.issues.update({
+                owner,
+                repo,
+                issue_number: 695,
+                body: publishedBody,
+              });
 
               const publicationMarker =
                 `<!-- devops-health-publication:${context.runId} -->`;
@@ -1074,10 +1190,14 @@ Build `investigation_rows_json` from the prior table using the invisible
 same-repository fingerprint link markers, never regenerated titles, for normal
 identity. Accept an old HTML-comment marker only as a bounded migration and
 rewrite it as the link marker. Include at most one row per active fingerprint.
-Each row has exactly `fingerprint`, `status`,
-`result_summary`, and `result_url`. Status is `pending`, `dispatched`, `done`,
-or `skipped`. Keep both result fields empty unless status is `done`; for a done
-row, copy the bounded summary and current-repository comment URL. The
+Each row has exactly `fingerprint`, `status`, `correlation_id`,
+`result_summary`, and `result_url`. Status is `pending`, `dispatching`,
+`dispatched`, `done`, or `skipped`. Keep both result fields empty unless status
+is `done`; for a done row, copy the bounded summary and canonical-dashboard
+comment URL. Use an empty correlation except for `dispatching` and
+`dispatched`. A selected dispatch must use `dispatching` with the same
+correlation as its dispatch input. Preserve and reuse that correlation when
+retrying an existing `dispatching` outbox row. The
 privileged job derives title, severity, and first-seen date from `state_json`
 and renders the row marker.
 
@@ -1122,15 +1242,19 @@ retry, apply the rules below and add selected worker inputs to the final
 | 🆕 NEW + 🟡 Warning + category `infra` or `resource` | **Skip** (self-explanatory) |
 | 🆕 NEW + 🔵 Info | **Never dispatch** |
 | 📌 EXISTING + qualifying + `⏳ Pending` or no investigation row | **Dispatch retry** |
+| 📌 EXISTING + `⏳ Dispatch pending` | **Reconcile/retry** using its persisted correlation |
 | 📌 EXISTING + already `🔄 Dispatched` or `✅ Done` | **Never dispatch again** |
 | ✅ RESOLVED (any) | **Never dispatch** |
 
 For every qualifying finding that is not selected because the run reaches its
 dispatch budget, add or preserve an Investigation Results row with
 `⏳ Pending — dispatch budget reached`. On a later run, treat that active
-EXISTING finding as a dispatch candidate. When selected, replace the pending
-status with `🔄 Dispatched` in the row keyed by its fingerprint link marker;
-do not append a second row. This prevents capped findings from becoming
+EXISTING finding as a dispatch candidate. When selected, set the structured row
+to `dispatching` with the dispatch correlation. The privileged job persists
+that retryable outbox row before dispatch, then changes it to `🔄 Dispatched`
+only after the API call succeeds or an existing run with that correlation is
+confirmed. Reuse an existing dispatching row's correlation. Do not append a
+second row. This prevents capped or transiently failed dispatches from becoming
 permanently ineligible or being dispatched more than once.
 
 **Budget:** Maximum **2** dispatches per run (limited to avoid investigation runs cancelling each other due to a shared agent concurrency group — see [gh-aw#20187](https://github.com/github/gh-aw/issues/20187)). If more than 2 qualify, prioritize by:

@@ -278,6 +278,7 @@ investigation dispatch:
 | 🆕 + 🟡 Warning + `infra` or `resource` category | **Skip** |
 | 🆕 + 🔵 Info | **Never dispatch** |
 | 📌 EXISTING + qualifying + `⏳ Pending` or no investigation row | **Dispatch retry** |
+| 📌 EXISTING + `⏳ Dispatch pending` | **Reconcile/retry with its persisted correlation** |
 | 📌 EXISTING + `🔄 Dispatched` or `✅ Done` | **Never dispatch again** |
 | ✅ RESOLVED | **Never dispatch** |
 
@@ -287,8 +288,11 @@ one Investigation Results row keyed by the invisible same-repository link
 `[](https://github.com/{owner}/{repo}/issues/695#investigation-fingerprint:{fingerprint})`
 with
 `⏳ Pending — dispatch budget reached`. Retry that active finding on later runs
-until it is dispatched. Change that same row to `🔄 Dispatched` when selected;
-never append a second row for the same fingerprint.
+until it is selected. Change that same structured row to `dispatching` with the
+dispatch correlation before publication. The privileged job persists that
+retryable outbox row before dispatch and changes it to `🔄 Dispatched` only
+after success or reconciliation. Preserve and reuse the correlation from an
+existing dispatching row. Never append a second row for the same fingerprint.
 **Priority order when cap is hit:**
 1. 🔴 Critical findings first
 2. Older pending findings before new findings at the same severity
