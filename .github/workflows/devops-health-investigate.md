@@ -6,7 +6,7 @@ description: >
   Dispatched by the health check orchestrator. It reports evidence,
   root cause, blast radius, and a proposed remediation without modifying
   repository files or executing repository code.
-run-name: "DevOps Health Investigation · ${{ inputs.correlation_id }}"
+run-name: "DevOps Health Investigation — ${{ inputs.correlation_id }}"
 
 on:
   permissions: {}
@@ -38,6 +38,12 @@ on:
         required: false
         type: boolean
         default: true
+  roles: all
+  steps:
+    - name: Initialize dispatched investigation
+      uses: actions/github-script@v9
+      with:
+        script: core.info("Starting validated workflow dispatch")
 
 concurrency:
   group: gh-aw-${{ github.workflow }}-${{ inputs.finding_id }}
@@ -62,182 +68,377 @@ safe-outputs:
   staged: ${{ inputs.dry_run }}
   report-failure-as-issue: false
   report-incomplete: false
-  report-failed-jobs: false
   jobs:
-    publish-investigation-report:
-      description: >
-        Verify health-check provenance and the canonical dashboard before
-        posting one investigation report.
-      if: inputs.dry_run == false && needs.detection.outputs.detection_success == 'true'
-      runs-on: ubuntu-slim
-      output: "Investigation report posted to the canonical health dashboard."
-      inputs:
-        report_body:
-          description: "Complete investigation report comment."
-          required: true
-          type: string
-      env:
-        EXPECTED_FINDING_ID: ${{ inputs.finding_id }}
-        EXPECTED_CORRELATION_ID: ${{ inputs.correlation_id }}
+    publish-investigation:
+      description: "Publish one provenance-validated investigation result"
+      if: >-
+        needs.agent.result == 'success' &&
+        needs.detection.result == 'success' &&
+        needs.detection.outputs.detection_success == 'true' &&
+        inputs.dry_run != true &&
+        contains(needs.agent.outputs.output_types, 'publish_investigation')
+      runs-on: ubuntu-latest
       permissions:
-        contents: read
         actions: read
         issues: write
+      inputs:
+        body:
+          description: "Validated investigation comment body"
+          required: true
+          type: string
       steps:
-        - name: Verify and publish investigation report
-          uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        - name: Publish investigation result
+          uses: actions/github-script@v9
+          env:
+            EXPECTED_REPOSITORY: ${{ github.repository }}
+            FINDING_ID: ${{ inputs.finding_id }}
+            FINDING_SEVERITY: ${{ inputs.finding_severity }}
+            HEALTH_ISSUE_NUMBER: ${{ inputs.health_issue_number }}
+            CORRELATION_ID: ${{ inputs.correlation_id }}
           with:
             script: |
               const fs = require("fs");
 
               if (context.actor !== "github-actions[bot]") {
-                throw new Error("Investigation publication requires github-actions[bot] provenance");
+                core.setFailed(
+                  "Investigation publication requires github-actions[bot] provenance"
+                );
+                return;
               }
               const outputPath = process.env.GH_AW_AGENT_OUTPUT;
               if (!outputPath) {
-                throw new Error("GH_AW_AGENT_OUTPUT is not configured");
+                core.setFailed("GH_AW_AGENT_OUTPUT is not set");
+                return;
               }
               const output = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-              const items = (output.items || []).filter(
-                item => item.type === "publish_investigation_report"
+              const allItems = Array.isArray(output.items) ? output.items : [];
+              const items = allItems.filter(
+                item => item.type === "publish_investigation"
               );
-              if (items.length !== 1) {
-                throw new Error(
-                  `Expected exactly one publish_investigation_report item, found ${items.length}`
+              if (allItems.length !== 1 || items.length !== 1) {
+                core.setFailed(
+                  `Expected publish_investigation as the only output item, got ${allItems.length} total`
                 );
+                return;
               }
 
-              const reportBody = items[0].report_body;
-              const findingId = process.env.EXPECTED_FINDING_ID;
-              const correlationId = process.env.EXPECTED_CORRELATION_ID;
+              const [owner, repo] = process.env.EXPECTED_REPOSITORY.split("/");
+              const findingId = process.env.FINDING_ID;
+              const severity = process.env.FINDING_SEVERITY;
+              const correlation = process.env.CORRELATION_ID;
+              const body = items[0].body;
+              const correlationMatch =
+                /^hc-\d{4}-\d{2}-\d{2}-(\d+)-\d+$/.exec(correlation);
               if (
-                typeof reportBody !== "string" ||
-                reportBody.length === 0 ||
-                reportBody.length > 65000 ||
+                process.env.HEALTH_ISSUE_NUMBER !== "695" ||
                 typeof findingId !== "string" ||
-                typeof correlationId !== "string"
+                findingId.length === 0 ||
+                findingId.length > 300 ||
+                /[\r\n]/.test(findingId) ||
+                !["critical", "warning", "info"].includes(severity) ||
+                !correlationMatch ||
+                typeof body !== "string" ||
+                body.length > 65000 ||
+                !body.startsWith("## 🔍 Investigation:") ||
+                body.includes("<!-- devops-health-state:v1")
               ) {
-                throw new Error("Investigation report inputs are invalid");
-              }
-              if (
-                !reportBody.startsWith("## 🔍 Investigation:") ||
-                !reportBody.match(
-                  new RegExp(
-                    `^\\*\\*Finding ID:\\*\\* \`${findingId.replace(
-                      /[.*+?^${}()|[\]\\]/g,
-                      "\\$&"
-                    )}\`\\s*$`,
-                    "m"
-                  )
-                ) ||
-                !reportBody.match(
-                  new RegExp(
-                    `^\\*\\*Correlation:\\*\\* ${correlationId}\\s*$`,
-                    "m"
-                  )
-                )
-              ) {
-                throw new Error("Investigation report identity does not match workflow inputs");
-              }
-              const correlation = correlationId.match(
-                /^hc-([1-9][0-9]*)-([1-9][0-9]*)$/
-              );
-              if (!correlation) {
-                throw new Error("Investigation correlation format is invalid");
-              }
-              const healthRunId = Number(correlation[1]);
-              const { data: healthRun } = await github.rest.actions.getWorkflowRun({
-                ...context.repo,
-                run_id: healthRunId,
-              });
-              if (
-                healthRun.path !==
-                  ".github/workflows/devops-health-check.lock.yml" ||
-                healthRun.event !== "schedule" &&
-                  healthRun.event !== "workflow_dispatch" ||
-                healthRun.status === "completed" &&
-                  healthRun.conclusion !== "success"
-              ) {
-                throw new Error("Correlation does not reference a valid health-check run");
+                core.setFailed("Investigation publication input failed validation");
+                return;
               }
 
-              for (const match of reportBody.matchAll(/https?:\/\/[^\s)<>"']+/g)) {
-                const link = new URL(match[0].replace(/[.,;:!?]+$/, ""));
-                if (link.protocol !== "https:" || link.hostname !== "github.com") {
-                  throw new Error(`Only github.com links are allowed: ${link.href}`);
+              const validateLinkDestination = destination => {
+                if (destination.startsWith("#")) {
+                  return;
                 }
+                if (destination.startsWith("//")) {
+                  throw new Error(
+                    `Protocol-relative links are not allowed: ${destination}`
+                  );
+                }
+                let link;
+                try {
+                  link = new URL(destination);
+                } catch {
+                  throw new Error(
+                    `Only absolute github.com links are allowed: ${destination}`
+                  );
+                }
+                if (
+                  link.protocol !== "https:" ||
+                  link.hostname !== "github.com"
+                ) {
+                  throw new Error(
+                    `Only github.com links are allowed: ${link.href}`
+                  );
+                }
+              };
+              const validateGitHubLinks = value => {
+                const rendered = value
+                  .replace(/```[\s\S]*?```/g, "")
+                  .replace(/`[^`\n]*`/g, "");
+                for (const match of rendered.matchAll(
+                  /https?:\/\/[^\s)<>"']+/gi
+                )) {
+                  validateLinkDestination(
+                    match[0].replace(/[.,;:!?]+$/, "")
+                  );
+                }
+                if (/(^|[^A-Za-z0-9@])www\.[A-Za-z0-9]/im.test(rendered)) {
+                  throw new Error("Bare www links are not allowed");
+                }
+                for (const match of rendered.matchAll(
+                  /!?\[[^\]\r\n]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g
+                )) {
+                  validateLinkDestination(match[1]);
+                }
+                for (const match of rendered.matchAll(
+                  /^[ \t]{0,3}\[[^\]\r\n]+\]:[ \t]*(?:<([^>\r\n]+)>|(\S+))/gm
+                )) {
+                  validateLinkDestination(match[1] || match[2]);
+                }
+                for (const match of rendered.matchAll(
+                  /(?:href|src)\s*=\s*["']([^"']+)["']/gi
+                )) {
+                  validateLinkDestination(match[1]);
+                }
+                return rendered;
+              };
+              let renderedBody;
+              try {
+                renderedBody = validateGitHubLinks(body);
+              } catch (error) {
+                core.setFailed(error.message);
+                return;
               }
-              const prose = reportBody
-                .replace(/```[\s\S]*?```/g, "")
-                .replace(/`[^`\n]*`/g, "");
-              if (/(^|[\s([{>,;:!?])@[A-Za-z0-9]/m.test(prose)) {
-                throw new Error("Investigation report contains an unsafe mention");
+              if (
+                /(^|[^A-Za-z0-9._%+-])@[A-Za-z0-9]/m.test(renderedBody)
+              ) {
+                core.setFailed("Investigation report contains an unsafe mention");
+                return;
               }
 
-              const issueNumber = 695;
-              const { data: issue } = await github.rest.issues.get({
-                ...context.repo,
-                issue_number: issueNumber,
+              const lines = body.split(/\r?\n/);
+              const findingLine = `**Finding ID:** \`${findingId}\``;
+              const severityLine = `**Severity:** ${severity}`;
+              const correlationLine = `**Correlation:** ${correlation}`;
+              const footer =
+                `<sub>🔍 [Investigation Run #${context.runNumber}](` +
+                `https://github.com/${owner}/${repo}/actions/runs/${context.runId})` +
+                ` · Dispatched by health check · ${correlation}</sub>`;
+              const exactSingleLine = (prefix, expected) => {
+                const matches = lines.filter(line => line.startsWith(prefix));
+                return matches.length === 1 && matches[0] === expected;
+              };
+              if (
+                !exactSingleLine("**Finding ID:**", findingLine) ||
+                !exactSingleLine("**Severity:**", severityLine) ||
+                !exactSingleLine("**Correlation:**", correlationLine) ||
+                !exactSingleLine("<sub>🔍 [Investigation Run #", footer)
+              ) {
+                core.setFailed("Investigation comment identity fields are invalid");
+                return;
+              }
+
+              const executiveLines = lines.filter(line =>
+                line.startsWith("**Executive Summary:**")
+              );
+              const executiveSummary =
+                executiveLines.length === 1
+                  ? executiveLines[0]
+                      .slice("**Executive Summary:**".length)
+                      .trim()
+                  : "";
+              const confidenceLines = lines.filter(line =>
+                line.startsWith("**Confidence:**")
+              );
+              const requiredHeadings = [
+                "### Root Cause",
+                "### Blast Radius",
+                "### Suggested Fix",
+                "### Remediation Status",
+                "### Evidence",
+                "### Related",
+              ];
+              const headingIndexes = requiredHeadings.map(heading => {
+                const matches = lines
+                  .map((line, index) => line === heading ? index : -1)
+                  .filter(index => index >= 0);
+                return matches.length === 1 ? matches[0] : -1;
               });
-              const labels = issue.labels.map(label =>
+              const separatorIndexes = lines
+                .map((line, index) => line === "---" ? index : -1)
+                .filter(index => index >= 0);
+              const footerIndex = lines.indexOf(footer);
+              const orderedIndexes = [
+                lines.indexOf(findingLine),
+                lines.indexOf(severityLine),
+                lines.indexOf(correlationLine),
+                executiveLines.length === 1
+                  ? lines.indexOf(executiveLines[0])
+                  : -1,
+                headingIndexes[0],
+                confidenceLines.length === 1
+                  ? lines.indexOf(confidenceLines[0])
+                  : -1,
+                ...headingIndexes.slice(1),
+                separatorIndexes.length === 1 ? separatorIndexes[0] : -1,
+                footerIndex,
+              ];
+              const indexesAreOrdered = orderedIndexes.every(
+                (index, position) =>
+                  index >= 0 &&
+                  (position === 0 || index > orderedIndexes[position - 1])
+              );
+              const meaningfulLinesBetween = (start, end) =>
+                lines
+                  .slice(start + 1, end)
+                  .map(line => line.trim())
+                  .filter(Boolean)
+                  .filter(line => !/^\{[^}]*\}$/.test(line));
+              const rootCause = meaningfulLinesBetween(
+                headingIndexes[0],
+                orderedIndexes[5]
+              );
+              const blastRadius = meaningfulLinesBetween(
+                headingIndexes[1],
+                headingIndexes[2]
+              );
+              const suggestedFix = meaningfulLinesBetween(
+                headingIndexes[2],
+                headingIndexes[3]
+              );
+              const remediationStatus = meaningfulLinesBetween(
+                headingIndexes[3],
+                headingIndexes[4]
+              );
+              const evidence = meaningfulLinesBetween(
+                headingIndexes[4],
+                headingIndexes[5]
+              );
+              const related = meaningfulLinesBetween(
+                headingIndexes[5],
+                separatorIndexes.length === 1 ? separatorIndexes[0] : -1
+              );
+              if (
+                executiveSummary.length === 0 ||
+                executiveSummary.length > 300 ||
+                confidenceLines.length !== 1 ||
+                !/^\*\*Confidence:\*\* (High|Medium|Low) — \S/.test(
+                  confidenceLines[0]
+                ) ||
+                headingIndexes.includes(-1) ||
+                separatorIndexes.length !== 1 ||
+                !indexesAreOrdered ||
+                rootCause.length === 0 ||
+                blastRadius.length === 0 ||
+                !suggestedFix.some(line => /^1\. \S/.test(line)) ||
+                remediationStatus.length === 0 ||
+                !remediationStatus[0].startsWith("Report-only.") ||
+                evidence.length === 0 ||
+                related.length === 0
+              ) {
+                core.setFailed("Investigation comment template is incomplete");
+                return;
+              }
+
+              const dashboard = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: 695,
+              });
+              const labels = dashboard.data.labels.map(label =>
                 typeof label === "string" ? label : label.name
               );
               if (
-                issue.pull_request ||
-                issue.state !== "open" ||
-                issue.title !== "🏥 Repository Health Dashboard" ||
+                dashboard.data.state !== "open" ||
+                dashboard.data.title !== "🏥 Repository Health Dashboard" ||
                 !labels.includes("devops-health")
               ) {
-                throw new Error("Dashboard issue identity validation failed");
+                core.setFailed("Issue 695 failed canonical dashboard validation");
+                return;
               }
-              const markerMatches = [
-                ...(issue.body || "").matchAll(
-                  /<!-- devops-health-state:v1\s*\n([\s\S]*?)\n-->/g
-                ),
-              ];
-              if (markerMatches.length !== 1) {
-                throw new Error("Dashboard state marker validation failed");
-              }
-              let state;
-              try {
-                state = JSON.parse(markerMatches[0][1]);
-              } catch (error) {
-                throw new Error(`Dashboard state JSON is invalid: ${error.message}`);
+
+              let sourceRun;
+              for (let attempt = 0; attempt < 30; attempt += 1) {
+                sourceRun = await github.rest.actions.getWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: Number(correlationMatch[1]),
+                });
+                if (sourceRun.data.status === "completed") {
+                  break;
+                }
+                await new Promise(resolve => setTimeout(resolve, 10000));
               }
               if (
-                !Array.isArray(state.active_findings) ||
-                !state.active_findings.some(
-                  finding =>
-                    finding &&
-                    finding.fingerprint === findingId &&
-                    finding.category === findingId.split(":", 1)[0]
-                )
+                sourceRun.data.event !== "schedule" &&
+                sourceRun.data.event !== "workflow_dispatch"
               ) {
-                throw new Error("Finding is not active in the dashboard state");
+                core.setFailed("Investigation source run has an invalid trigger");
+                return;
               }
-              const escapedFindingId = findingId.replace(
-                /[.*+?^${}()|[\]\\]/g,
-                "\\$&"
-              );
-              const escapedCorrelationId = correlationId.replace(
-                /[.*+?^${}()|[\]\\]/g,
-                "\\$&"
-              );
-              const pendingRowPattern = new RegExp(
-                `^\\| \`${escapedFindingId}\` \\| [^|]* \\| [^|]* ` +
-                  `\\| ⏳ Pending \\| [^|]* \\| [^\\r\\n]*` +
-                  `<!-- correlation:${escapedCorrelationId} --> [^\\r\\n]*\\|$`,
-                "m"
-              );
-              if (!pendingRowPattern.test(issue.body || "")) {
-                throw new Error(
-                  "Finding and correlation are not an active pending dashboard row"
+              if (
+                sourceRun.data.status !== "completed" ||
+                sourceRun.data.conclusion !== "success" ||
+                sourceRun.data.path?.split("@")[0] !==
+                  ".github/workflows/devops-health-check.lock.yml" ||
+                sourceRun.data.head_repository?.full_name !== `${owner}/${repo}`
+              ) {
+                core.setFailed("Investigation source run failed provenance validation");
+                return;
+              }
+
+              const encodeMarker = value =>
+                encodeURIComponent(value).replace(
+                  /[!'()*]/g,
+                  character =>
+                    `%${character.charCodeAt(0).toString(16).toUpperCase()}`
                 );
+              const fingerprintMarker =
+                `#investigation-fingerprint:${encodeMarker(findingId)})`;
+              const correlationMarker =
+                `#investigation-correlation:${correlation})`;
+              const matchingRows = (dashboard.data.body || "")
+                .split(/\r?\n/)
+                .filter(line =>
+                  line.includes(fingerprintMarker) &&
+                  line.includes(correlationMarker) &&
+                  (
+                    line.includes("⏳ Dispatch pending") ||
+                    line.includes("🔄 Dispatched")
+                  )
+                );
+              if (matchingRows.length !== 1) {
+                core.setFailed(
+                  "Dashboard does not contain one matching active investigation row"
+                );
+                return;
               }
+
+              const comments = await github.paginate(
+                github.rest.issues.listComments,
+                {
+                  owner,
+                  repo,
+                  issue_number: 695,
+                  per_page: 100,
+                }
+              );
+              const alreadyPublished = comments.some(comment =>
+                comment.user?.login === "github-actions[bot]" &&
+                (comment.body || "").split(/\r?\n/).includes(findingLine) &&
+                (comment.body || "").split(/\r?\n/).includes(correlationLine)
+              );
+              if (alreadyPublished) {
+                core.info("Matching investigation comment already exists");
+                return;
+              }
+
               await github.rest.issues.createComment({
-                ...context.repo,
-                issue_number: issueNumber,
-                body: reportBody,
+                owner,
+                repo,
+                issue_number: 695,
+                body,
               });
   noop:
     report-as-issue: false
@@ -317,7 +518,7 @@ any resource, enforce all of these rules:
    the finding fingerprint. Do not fetch a resource merely because an input
    points to it.
 9. `correlation_id` matches
-   `hc-{numeric_health_run_id}-{numeric_sequence}`.
+   `hc-{YYYY-MM-DD}-{numeric_health_run_id}-{numeric_sequence}`.
 
 After the structural checks, fetch only the trusted GitHub metadata or
 repository configuration needed to recompute the finding. Do not fetch
@@ -424,16 +625,16 @@ stop.
 Re-fetch the configured issue directly from the current repository. Verify
 again that it is open and has both the title `🏥 Repository Health Dashboard`
 and the `devops-health` label. If any check fails, call `noop` with the report
-and stop; do not call `publish-investigation-report`.
+and stop; do not call `publish-investigation`.
 
-**IMPORTANT**: You MUST use the `publish-investigation-report` safe-output job.
-Its privileged step verifies `github-actions[bot]` dispatch provenance, the
-referenced health-check run, report identity fields, and canonical issue `695`
-before posting. Do not call `add-comment` or `update-issue` directly.
+**IMPORTANT**: You MUST use the `publish-investigation` safe-output tool. It
+accepts only the comment body. The privileged job binds the repository and
+issue, validates the canonical dashboard, verifies the source health-check run
+and matching outbox row, and posts at most one idempotent comment.
 
 ```
-publish-investigation-report:
-  report_body: |
+publish-investigation:
+  body: |
     ## 🔍 Investigation: {canonical_title derived from trusted metadata}
 
     **Finding ID:** `{finding_id}`
@@ -468,9 +669,9 @@ publish-investigation-report:
     <sub>🔍 [Investigation Run #{this_run_number}]({this_run_url}) · Dispatched by health check · {correlation_id}</sub>
 ```
 
-If `dry_run` is true, do not call `publish-investigation-report`. Call `noop`
-exactly once with a compact summary of the root cause, evidence confidence,
-remediation proposal, validation plan, and owner.
+If `dry_run` is true, do not call `publish-investigation`.
+Call `noop` exactly once with a compact summary of the root cause, evidence
+confidence, remediation proposal, validation plan, and owner.
 
 ---
 

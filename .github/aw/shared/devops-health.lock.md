@@ -19,10 +19,6 @@ fingerprint = "pipeline:{workflow_name}:{job_name}:{failed_step}:{conclusion}"
 
 - Normalize `workflow_name` by lowercasing and replacing spaces with hyphens
 - Normalize `job_name` and `failed_step` the same way
-- For workflow, job, step, component, skill, and plugin segments, lowercase and
-  replace each run of characters outside `[a-z0-9._-]` with `-`. An I6 action
-  name may retain its single owner/repository `/`. Fingerprints never contain
-  `@`, whitespace, Markdown delimiters, or mention-triggering text.
 - Same workflow + job + step + conclusion = same finding (even across different run IDs)
 - A workflow that fails in a _different_ step is a _different_ finding
 - For timeouts/cancellations: `pipeline:{workflow_name}:{job_name}:timeout`
@@ -272,25 +268,40 @@ When a finding's fingerprint matches any known-noise pattern (prefix match), dem
 
 ## 5. Investigation Dispatch Rules
 
-Every active `⏳ Pending` row that meets these criteria is eligible for
-reconciliation and investigation dispatch, regardless of whether the finding
-is NEW or EXISTING:
+New findings and pending retries that meet these criteria qualify for
+investigation dispatch:
 
 | Condition | Action |
 |-----------|--------|
-| Active + `⏳ Pending` + 🔴 Critical | **Reconcile, then dispatch if needed** |
-| Active + `⏳ Pending` + 🟡 Warning + `pipeline` | **Reconcile, then dispatch if needed** |
-| Active + 🟡 Warning + `infra` or `resource` | **No investigation row needed** |
-| Active + 🔵 Info | **No investigation row needed** |
-| `✅ Done` or ✅ RESOLVED | **Never dispatch** |
+| 🆕 + 🔴 Critical | **Always dispatch** |
+| 🆕 + 🟡 Warning + `pipeline` category | **Dispatch** |
+| 🆕 + 🟡 Warning + `infra` or `resource` category | **Skip** |
+| 🆕 + 🔵 Info | **Never dispatch** |
+| 📌 EXISTING + qualifying + `⏳ Pending` or no investigation row | **Dispatch retry** |
+| 📌 EXISTING + `⏳ Dispatch pending` | **Reconcile/retry with its persisted correlation** |
+| 📌 EXISTING + `🔄 Dispatched` or `✅ Done` | **Never dispatch again** |
+| ✅ RESOLVED | **Never dispatch** |
 
-**Budget cap:** Reconcile all pending rows, then create at most 2 new dispatches
-per run. Rows already queued, running, or backed by a successful correlated
-report do not consume this budget.
+**Budget cap:** Maximum 2 dispatches per run.
+For every qualifying finding not selected because of the cap, add or preserve
+one Investigation Results row keyed by the invisible same-repository link
+`[](https://github.com/{owner}/{repo}/issues/695#investigation-fingerprint:{fingerprint})`
+with
+`⏳ Pending — dispatch budget reached`. Retry that active finding on later runs
+until it is selected. Change that same structured row to `dispatching` with the
+dispatch correlation before publication. The privileged job persists that
+retryable outbox row before dispatch and changes it to `🔄 Dispatched` only
+after success or reconciliation. Preserve and reuse the correlation from an
+existing dispatching row. Never append a second row for the same fingerprint.
+When an investigation becomes `done`, preserve its valid correlation and
+accept the result only when the referenced issue-695 comment is authored by
+`github-actions[bot]` and contains exactly matching finding, correlation, and
+executive-summary fields.
 **Priority order when cap is hit:**
 1. 🔴 Critical findings first
-2. Pipeline findings before infrastructure
-3. Other categories last
+2. Older pending findings before new findings at the same severity
+3. Pipeline findings before infrastructure
+4. Other categories last
 
 ## 6. Output Templates
 
@@ -327,13 +338,14 @@ If the validated dashboard body has no valid previous state:
 | Δ negative and bad (e.g., success rate down) | ⚠️ | Degrading |
 | Δ ≈ 0 | ➡️ | Stable |
 
-### 6.5 Investigation Island Template
+### 6.5 Investigation Row Identity
 
 ```markdown
-<!-- investigation:{fingerprint} -->
-⏳ Investigation dispatched — results arriving shortly...
-<!-- /investigation:{fingerprint} -->
+[](https://github.com/{owner}/{repo}/issues/695#investigation-fingerprint:{fingerprint})
 ```
+
+Use this invisible same-repository link at the start of the Finding cell.
+Do not create per-finding islands or HTML-comment row markers.
 
 ---
 
@@ -342,41 +354,26 @@ If the validated dashboard body has no valid previous state:
 ### 7.1 API Rate Limits
 - Use targeted, date-filtered queries to minimize API calls
 - The `github` MCP toolset handles pagination automatically
-- Space dispatches 5 seconds apart
+- Include at most two dispatch inputs in the single publication request
 
 ### 7.2 Issue Body Size
 - GitHub issues have a ~65,535 character limit
 - If body exceeds 60k: truncate EXISTING section (keep top 20 by severity)
 - Footer: `> … N additional existing findings omitted`
 - The daily comment always includes complete summary counts
-- Validate the complete body, including the state marker, before any safe
-  output. If visible-section reduction cannot bring it to 60,000 characters or
-  fewer, emit only `noop`.
+- Validate the complete visible body, state JSON, and structured investigation
+  rows before any safe output. If the privileged renderer cannot keep the final
+  body at 60,000 characters or fewer, emit only `noop`.
 
 ### 7.3 Dashboard State
 
 Issue `695` is both the human-readable dashboard and the bounded persistence
 surface. Read its previous state only after validating the issue identity. Write
-the next state only through the transactional `publish-health-dashboard`
-operation. That operation must verify the issue identity and observed
-`updated_at`, replace the body successfully, and only then dispatch
-investigations or post the daily audit comment. Do not use files, caches, shell
-commands, repository edits, or any other storage surface.
-
-Every Investigation Results row must include the finding fingerprint in a
-dedicated `Finding ID` column. Producers, investigators, and groomers correlate
-and de-duplicate exclusively by this ID; titles are display-only. Every active
-finding eligible for investigation must retain a durable row. Rows start as
-`⏳ Pending`, including findings deferred by the two-dispatch budget or a failed
-dispatch attempt. They remain pending until the groomer receives the correlated
-investigation comment and changes the row to `✅ Done`; a dispatch never
-requires a second dashboard write. Pending rows remain eligible on later
-health-check runs. Each pending row stores a hidden, episode-specific
-correlation ID derived from the creating health-check run ID; preserve it until
-the row is resolved or completed. Correlation IDs must be unique across active
-rows. Match investigation reports using both Finding ID and correlation ID.
-Retain a matching bot report for an active pending row regardless of comment
-age; time windows apply only to unrelated or legacy comments.
+the next state only through the fenced `state_json` field of the single
+`publish-health-report` request. The privileged publication job validates the
+state and renders its HTML marker after gh-aw sanitizes the visible Markdown.
+The fence preserves the JSON as a code region during sanitization. Do not use
+files, caches, shell commands, repository edits, or any other storage surface.
 
 ### 7.4 Graceful Degradation
 

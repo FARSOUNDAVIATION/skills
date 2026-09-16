@@ -1,5 +1,5 @@
-# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"40db5b11956b0097c6b6b8289af92a03afe31e4a74338166f6d09ddd9e2be4e3","body_hash":"421e044a12c72b5e7a1777b99685be999509819aa808b413719e85a28b2a16ea","compiler_version":"v0.88.7","strict":true,"agent_id":"copilot","agent_model":"${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'gpt-5.6-sol' }}","engine_versions":{"copilot":"1.0.80"}}
-# gh-aw-manifest: {"version":1,"secrets":["COPILOT_PAT_0","COPILOT_PAT_1","COPILOT_PAT_2","COPILOT_PAT_3","COPILOT_PAT_4","COPILOT_PAT_5","COPILOT_PAT_6","COPILOT_PAT_7","COPILOT_PAT_8","COPILOT_PAT_9","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"},{"repo":"github/gh-aw-actions/setup","sha":"5e508589e03a7757a7e05b26e834292f5445bfb6","version":"v0.88.7"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14","digest":"sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14@sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14","digest":"sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14@sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14","digest":"sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14@sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.18","digest":"sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.18@sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d","pinned_image":"ghcr.io/github/gh-aw-node@sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d"},{"image":"ghcr.io/github/github-mcp-server:v1.11.0","digest":"sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699","pinned_image":"ghcr.io/github/github-mcp-server:v1.11.0@sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699"}],"mcp_servers":[{"name":"github","tools":["actions_get","actions_list","get_commit","get_file_contents","get_job_logs","get_latest_release","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["missing_data","missing_tool","noop","publish_investigation_report"]}]}
+# gh-aw-metadata: {"schema_version":"v4","frontmatter_hash":"30501d86a7147ac56d52af868586f79ed40806b6e666ae657d8b339938b2f56a","body_hash":"c637a9ea878222ba469e2ba60486729fb3493774b009ad9138d303f95c8933f0","compiler_version":"v0.88.7","strict":true,"agent_id":"copilot","agent_model":"${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'gpt-5.6-sol' }}","engine_versions":{"copilot":"1.0.80"}}
+# gh-aw-manifest: {"version":1,"secrets":["COPILOT_PAT_0","COPILOT_PAT_1","COPILOT_PAT_2","COPILOT_PAT_3","COPILOT_PAT_4","COPILOT_PAT_5","COPILOT_PAT_6","COPILOT_PAT_7","COPILOT_PAT_8","COPILOT_PAT_9","GH_AW_DEFAULT_OTLP_HEADERS","GH_AW_GITHUB_MCP_SERVER_TOKEN","GH_AW_GITHUB_TOKEN","GITHUB_TOKEN"],"actions":[{"repo":"actions/cache/restore","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/cache/save","sha":"55cc8345863c7cc4c66a329aec7e433d2d1c52a9","version":"v6.1.0"},{"repo":"actions/checkout","sha":"3d3c42e5aac5ba805825da76410c181273ba90b1","version":"v7.0.1"},{"repo":"actions/download-artifact","sha":"3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c","version":"v8.0.1"},{"repo":"actions/github-script","sha":"3a2844b7e9c422d3c10d287c895573f7108da1b3","version":"v9.0.0"},{"repo":"actions/setup-node","sha":"820762786026740c76f36085b0efc47a31fe5020","version":"v7.0.0"},{"repo":"actions/upload-artifact","sha":"043fb46d1a93c77aae656e7c1c64a875d1fc6a0a","version":"v7.0.1"},{"repo":"github/gh-aw-actions/setup","sha":"5e508589e03a7757a7e05b26e834292f5445bfb6","version":"v0.88.7"}],"containers":[{"image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14","digest":"sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98","pinned_image":"ghcr.io/github/gh-aw-firewall/agent:0.28.14@sha256:f7df036c86575527b61f3f7df91c4412349a12b2a74988d929eafa2999230c98"},{"image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14","digest":"sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5","pinned_image":"ghcr.io/github/gh-aw-firewall/api-proxy:0.28.14@sha256:6f95e2234dd9bd6333a8ff28ccea7ecf0204acd4a09108723844dbd2bf6268c5"},{"image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14","digest":"sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5","pinned_image":"ghcr.io/github/gh-aw-firewall/squid:0.28.14@sha256:2ce8df3abf3e9b76e9c0cf5863da41f1ab3f89b20ad14b988806ab89e7bf2cd5"},{"image":"ghcr.io/github/gh-aw-mcpg:v0.4.18","digest":"sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53","pinned_image":"ghcr.io/github/gh-aw-mcpg:v0.4.18@sha256:85b940556a8faa4e1fdbef124bfd75f2c4ebd855a10b88a1c3b6f3e97f6f1a53"},{"image":"ghcr.io/github/gh-aw-node","digest":"sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d","pinned_image":"ghcr.io/github/gh-aw-node@sha256:33e1ec1d967ac1f28c2cedc24ce103dea3226840626de345d3fe579e96cf5c7d"},{"image":"ghcr.io/github/github-mcp-server:v1.11.0","digest":"sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699","pinned_image":"ghcr.io/github/github-mcp-server:v1.11.0@sha256:fbec75de11c255213fa08d80fb166abe73d851fff631c51c0079872967720699"}],"mcp_servers":[{"name":"github","tools":["actions_get","actions_list","get_commit","get_file_contents","get_job_logs","get_latest_release","get_pull_request","get_pull_request_comments","get_pull_request_diff","get_pull_request_files","get_pull_request_review_comments","get_pull_request_reviews","get_pull_request_status","get_release_by_tag","get_tag","issue_read","list_branches","list_commits","list_issue_types","list_issues","list_pull_requests","list_releases","list_starred_repositories","list_tags","pull_request_read","search_code","search_issues","search_pull_requests","search_repositories"]},{"name":"safeoutputs","tools":["missing_data","missing_tool","noop","publish_investigation"]}]}
 # This file was automatically generated by gh-aw (v0.88.7). DO NOT EDIT. To debug this workflow, load the skill at https://github.com/github/gh-aw/blob/main/debug.md
 #
 #    ___                   _   _
@@ -69,6 +69,12 @@
 name: "DevOps Health — Deep Investigation"
 on:
   # permissions: {} # Permissions applied to pre-activation job
+  # roles: all # Roles processed as role check in pre-activation job
+  # steps: # Steps injected into pre-activation job
+  # - name: Initialize dispatched investigation
+  # uses: actions/github-script@v9
+  # with:
+  # script: core.info("Starting validated workflow dispatch")
   workflow_dispatch:
     inputs:
       aw_context:
@@ -108,7 +114,7 @@ permissions: {}
 concurrency:
   group: gh-aw-${{ github.workflow }}-${{ inputs.finding_id }}
 
-run-name: DevOps Health Investigation · ${{ inputs.correlation_id }}
+run-name: DevOps Health Investigation — ${{ inputs.correlation_id }}
 
 env:
   OTEL_EXPORTER_OTLP_ENDPOINT: ${{ vars.GH_AW_DEFAULT_OTLP_ENDPOINT }}
@@ -320,7 +326,7 @@ jobs:
           GH_AW_INPUTS_HEALTH_ISSUE_NUMBER: ${{ inputs.health_issue_number }}
           GH_AW_INPUTS_RESOURCE_URL: ${{ inputs.resource_url }}
           GH_AW_PROMPT_CONTENT_0000: "<system>\n"
-          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: missing_tool, missing_data, noop, publish_investigation_report\n"
+          GH_AW_PROMPT_CONTENT_0001: "<safe-output-tools>\nTools: missing_tool, missing_data, noop, publish_investigation\n"
           GH_AW_PROMPT_CONTENT_0002: "</safe-output-tools>\n"
           GH_AW_PROMPT_CONTENT_0003: "<github-context>\nThe following GitHub context information is available for this workflow:\n{{#if github.actor}}\n- **actor**: __GH_AW_GITHUB_ACTOR__\n{{/if}}\n{{#if github.repository}}\n- **repository**: __GH_AW_GITHUB_REPOSITORY__\n{{/if}}\n{{#if github.workspace}}\n- **workspace**: __GH_AW_GITHUB_WORKSPACE__\n{{/if}}\n{{#if github.event.issue.number || (github.aw.context.item_type == 'issue' && github.aw.context.item_number)}}\n- **issue-number**: #__GH_AW_EXPR_802A9F6A__\n{{/if}}\n{{#if github.event.discussion.number || (github.aw.context.item_type == 'discussion' && github.aw.context.item_number)}}\n- **discussion-number**: #__GH_AW_EXPR_1A3A194A__\n{{/if}}\n{{#if github.event.pull_request.number || (github.aw.context.item_type == 'pull_request' && github.aw.context.item_number)}}\n- **pull-request-number**: #__GH_AW_EXPR_463A214A__\n{{/if}}\n{{#if github.event.comment.id || github.aw.context.comment_id}}\n- **comment-id**: __GH_AW_EXPR_FF1D34CE__\n{{/if}}\n{{#if github.run_id}}\n- **workflow-run-id**: __GH_AW_GITHUB_RUN_ID__\n{{/if}}\n</github-context>\n\n"
           GH_AW_PROMPT_CONTENT_0004: "</system>\n"
@@ -609,7 +615,7 @@ jobs:
         env:
           GH_AW_FILE_ROOT: "${{ runner.temp }}/gh-aw"
           GH_AW_FILE_CONFIG: "{\"files\":[{\"path\":\"safeoutputs/config.json\",\"content_env\":\"GH_AW_SAFE_OUTPUTS_CONFIG\"}]}"
-          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"},\"publish-investigation-report\":{\"description\":\"Verify health-check provenance and the canonical dashboard before posting one investigation report.\\n\",\"inputs\":{\"report_body\":{\"default\":null,\"description\":\"Complete investigation report comment.\",\"required\":true,\"type\":\"string\"}},\"output\":\"Investigation report posted to the canonical health dashboard.\"}}"
+          GH_AW_SAFE_OUTPUTS_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"},\"publish-investigation\":{\"description\":\"Publish one provenance-validated investigation result\",\"inputs\":{\"body\":{\"default\":null,\"description\":\"Validated investigation comment body\",\"required\":true,\"type\":\"string\"}}}}"
         with:
           script: |
             const path = require('path');
@@ -626,21 +632,21 @@ jobs:
               "repo_params": {},
               "dynamic_tools": [
                 {
-                  "description": "Verify health-check provenance and the canonical dashboard before posting one investigation report.\n",
+                  "description": "Publish one provenance-validated investigation result",
                   "inputSchema": {
                     "additionalProperties": false,
                     "properties": {
-                      "report_body": {
-                        "description": "Complete investigation report comment.",
+                      "body": {
+                        "description": "Validated investigation comment body",
                         "type": "string"
                       }
                     },
                     "required": [
-                      "report_body"
+                      "body"
                     ],
                     "type": "object"
                   },
-                  "name": "publish_investigation_report"
+                  "name": "publish_investigation"
                 }
               ]
             }
@@ -1157,7 +1163,7 @@ jobs:
       - agent
       - detection
       - pat_pool
-      - publish_investigation_report
+      - publish_investigation
       - safe_outputs
     if: >
       always() && (needs.agent.result != 'skipped' || needs.activation.outputs.lockdown_check_failed == 'true' ||
@@ -1400,6 +1406,25 @@ jobs:
             const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
             setupGlobals(core, github, context, exec, io, getOctokit);
             const { main } = require(path.join(actionsDir, 'handle_agent_failure.cjs'));
+            await main();
+      - name: Report failed jobs
+        id: report_failed_jobs
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
+          GH_AW_WORKFLOW_NAME: "DevOps Health — Deep Investigation"
+          GH_AW_WORKFLOW_SOURCE_URL: "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.ref_name }}/.github/workflows/devops-health-investigate.md"
+          GH_AW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GH_AW_REPORT_FAILED_JOBS: "true"
+        with:
+          github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const path = require('path');
+            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
+            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
+            setupGlobals(core, github, context, exec, io, getOctokit);
+            const { main } = require(path.join(actionsDir, 'report_failed_jobs.cjs'));
             await main();
 
   detection:
@@ -1748,7 +1773,7 @@ jobs:
     env:
       GH_AW_RUNTIME_FEATURES: ${{ vars.GH_AW_RUNTIME_FEATURES }}
     outputs:
-      activated: ${{ steps.check_membership.outputs.is_team_member == 'true' }}
+      activated: ${{ 'true' }}
       matched_command: ''
       setup-parent-span-id: ${{ steps.setup.outputs.parent-span-id || steps.setup.outputs.span-id }}
       setup-span-id: ${{ steps.setup.outputs.span-id }}
@@ -1766,33 +1791,23 @@ jobs:
           GH_AW_INFO_VERSION: "1.0.80"
           GH_AW_INFO_AWF_VERSION: "v0.28.14"
           GH_AW_INFO_ENGINE_ID: "copilot"
-      - name: Check team membership for workflow
-        id: check_membership
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          GH_AW_REQUIRED_ROLES: "admin,maintainer,write"
+      - name: Initialize dispatched investigation
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const path = require('path');
-            const actionsDir = path.join(process.env.RUNNER_TEMP, 'gh-aw', 'actions');
-            const { setupGlobals } = require(path.join(actionsDir, 'setup_globals.cjs'));
-            setupGlobals(core, github, context, exec, io, getOctokit);
-            const { main } = require(path.join(actionsDir, 'check_membership.cjs'));
-            await main();
+          script: core.info("Starting validated workflow dispatch")
 
-  publish_investigation_report:
+  publish_investigation:
     needs:
       - agent
       - detection
     if: >
-      (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'publish_investigation_report') &&
-      (inputs.dry_run == false && needs.detection.outputs.detection_success == 'true')
-    runs-on: ubuntu-slim
+      (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'publish_investigation') &&
+      (needs.agent.result == 'success' && needs.detection.result == 'success' && needs.detection.outputs.detection_success == 'true' &&
+      inputs.dry_run != true && contains(needs.agent.outputs.output_types, 'publish_investigation'))
+    runs-on: ubuntu-latest
     environment: copilot-pat-pool
     permissions:
       actions: read
-      contents: read
       issues: write
     steps:
       - name: Download agent output artifact
@@ -1802,164 +1817,359 @@ jobs:
           pattern: "{agent,agent-output-fallback}"
           merge-multiple: true
           path: ${{ runner.temp }}/gh-aw/safe-jobs/
-      - name: Verify and publish investigation report
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      - name: Publish investigation result
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0 (source v9)
         env:
-          EXPECTED_CORRELATION_ID: ${{ inputs.correlation_id }}
-          EXPECTED_FINDING_ID: ${{ inputs.finding_id }}
+          CORRELATION_ID: ${{ inputs.correlation_id }}
+          EXPECTED_REPOSITORY: ${{ github.repository }}
+          FINDING_ID: ${{ inputs.finding_id }}
+          FINDING_SEVERITY: ${{ inputs.finding_severity }}
           GH_AW_AGENT_OUTPUT: ${{ runner.temp }}/gh-aw/safe-jobs/agent_output.json
+          HEALTH_ISSUE_NUMBER: ${{ inputs.health_issue_number }}
         with:
           script: |
             const fs = require("fs");
 
             if (context.actor !== "github-actions[bot]") {
-              throw new Error("Investigation publication requires github-actions[bot] provenance");
+              core.setFailed(
+                "Investigation publication requires github-actions[bot] provenance"
+              );
+              return;
             }
             const outputPath = process.env.GH_AW_AGENT_OUTPUT;
             if (!outputPath) {
-              throw new Error("GH_AW_AGENT_OUTPUT is not configured");
+              core.setFailed("GH_AW_AGENT_OUTPUT is not set");
+              return;
             }
             const output = JSON.parse(fs.readFileSync(outputPath, "utf8"));
-            const items = (output.items || []).filter(
-              item => item.type === "publish_investigation_report"
+            const allItems = Array.isArray(output.items) ? output.items : [];
+            const items = allItems.filter(
+              item => item.type === "publish_investigation"
             );
-            if (items.length !== 1) {
-              throw new Error(
-                `Expected exactly one publish_investigation_report item, found ${items.length}`
+            if (allItems.length !== 1 || items.length !== 1) {
+              core.setFailed(
+                `Expected publish_investigation as the only output item, got ${allItems.length} total`
               );
+              return;
             }
 
-            const reportBody = items[0].report_body;
-            const findingId = process.env.EXPECTED_FINDING_ID;
-            const correlationId = process.env.EXPECTED_CORRELATION_ID;
+            const [owner, repo] = process.env.EXPECTED_REPOSITORY.split("/");
+            const findingId = process.env.FINDING_ID;
+            const severity = process.env.FINDING_SEVERITY;
+            const correlation = process.env.CORRELATION_ID;
+            const body = items[0].body;
+            const correlationMatch =
+              /^hc-\d{4}-\d{2}-\d{2}-(\d+)-\d+$/.exec(correlation);
             if (
-              typeof reportBody !== "string" ||
-              reportBody.length === 0 ||
-              reportBody.length > 65000 ||
+              process.env.HEALTH_ISSUE_NUMBER !== "695" ||
               typeof findingId !== "string" ||
-              typeof correlationId !== "string"
+              findingId.length === 0 ||
+              findingId.length > 300 ||
+              /[\r\n]/.test(findingId) ||
+              !["critical", "warning", "info"].includes(severity) ||
+              !correlationMatch ||
+              typeof body !== "string" ||
+              body.length > 65000 ||
+              !body.startsWith("## 🔍 Investigation:") ||
+              body.includes("<!-- devops-health-state:v1")
             ) {
-              throw new Error("Investigation report inputs are invalid");
-            }
-            if (
-              !reportBody.startsWith("## 🔍 Investigation:") ||
-              !reportBody.match(
-                new RegExp(
-                  `^\\*\\*Finding ID:\\*\\* \`${findingId.replace(
-                    /[.*+?^${}()|[\]\\]/g,
-                    "\\$&"
-                  )}\`\\s*$`,
-                  "m"
-                )
-              ) ||
-              !reportBody.match(
-                new RegExp(
-                  `^\\*\\*Correlation:\\*\\* ${correlationId}\\s*$`,
-                  "m"
-                )
-              )
-            ) {
-              throw new Error("Investigation report identity does not match workflow inputs");
-            }
-            const correlation = correlationId.match(
-              /^hc-([1-9][0-9]*)-([1-9][0-9]*)$/
-            );
-            if (!correlation) {
-              throw new Error("Investigation correlation format is invalid");
-            }
-            const healthRunId = Number(correlation[1]);
-            const { data: healthRun } = await github.rest.actions.getWorkflowRun({
-              ...context.repo,
-              run_id: healthRunId,
-            });
-            if (
-              healthRun.path !==
-                ".github/workflows/devops-health-check.lock.yml" ||
-              healthRun.event !== "schedule" &&
-                healthRun.event !== "workflow_dispatch" ||
-              healthRun.status === "completed" &&
-                healthRun.conclusion !== "success"
-            ) {
-              throw new Error("Correlation does not reference a valid health-check run");
+              core.setFailed("Investigation publication input failed validation");
+              return;
             }
 
-            for (const match of reportBody.matchAll(/https?:\/\/[^\s)<>"']+/g)) {
-              const link = new URL(match[0].replace(/[.,;:!?]+$/, ""));
-              if (link.protocol !== "https:" || link.hostname !== "github.com") {
-                throw new Error(`Only github.com links are allowed: ${link.href}`);
+            const validateLinkDestination = destination => {
+              if (destination.startsWith("#")) {
+                return;
               }
+              if (destination.startsWith("//")) {
+                throw new Error(
+                  `Protocol-relative links are not allowed: ${destination}`
+                );
+              }
+              let link;
+              try {
+                link = new URL(destination);
+              } catch {
+                throw new Error(
+                  `Only absolute github.com links are allowed: ${destination}`
+                );
+              }
+              if (
+                link.protocol !== "https:" ||
+                link.hostname !== "github.com"
+              ) {
+                throw new Error(
+                  `Only github.com links are allowed: ${link.href}`
+                );
+              }
+            };
+            const validateGitHubLinks = value => {
+              const rendered = value
+                .replace(/```[\s\S]*?```/g, "")
+                .replace(/`[^`\n]*`/g, "");
+              for (const match of rendered.matchAll(
+                /https?:\/\/[^\s)<>"']+/gi
+              )) {
+                validateLinkDestination(
+                  match[0].replace(/[.,;:!?]+$/, "")
+                );
+              }
+              if (/(^|[^A-Za-z0-9@])www\.[A-Za-z0-9]/im.test(rendered)) {
+                throw new Error("Bare www links are not allowed");
+              }
+              for (const match of rendered.matchAll(
+                /!?\[[^\]\r\n]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g
+              )) {
+                validateLinkDestination(match[1]);
+              }
+              for (const match of rendered.matchAll(
+                /^[ \t]{0,3}\[[^\]\r\n]+\]:[ \t]*(?:<([^>\r\n]+)>|(\S+))/gm
+              )) {
+                validateLinkDestination(match[1] || match[2]);
+              }
+              for (const match of rendered.matchAll(
+                /(?:href|src)\s*=\s*["']([^"']+)["']/gi
+              )) {
+                validateLinkDestination(match[1]);
+              }
+              return rendered;
+            };
+            let renderedBody;
+            try {
+              renderedBody = validateGitHubLinks(body);
+            } catch (error) {
+              core.setFailed(error.message);
+              return;
             }
-            const prose = reportBody
-              .replace(/```[\s\S]*?```/g, "")
-              .replace(/`[^`\n]*`/g, "");
-            if (/(^|[\s([{>,;:!?])@[A-Za-z0-9]/m.test(prose)) {
-              throw new Error("Investigation report contains an unsafe mention");
+            if (
+              /(^|[^A-Za-z0-9._%+-])@[A-Za-z0-9]/m.test(renderedBody)
+            ) {
+              core.setFailed("Investigation report contains an unsafe mention");
+              return;
             }
 
-            const issueNumber = 695;
-            const { data: issue } = await github.rest.issues.get({
-              ...context.repo,
-              issue_number: issueNumber,
+            const lines = body.split(/\r?\n/);
+            const findingLine = `**Finding ID:** \`${findingId}\``;
+            const severityLine = `**Severity:** ${severity}`;
+            const correlationLine = `**Correlation:** ${correlation}`;
+            const footer =
+              `<sub>🔍 [Investigation Run #${context.runNumber}](` +
+              `https://github.com/${owner}/${repo}/actions/runs/${context.runId})` +
+              ` · Dispatched by health check · ${correlation}</sub>`;
+            const exactSingleLine = (prefix, expected) => {
+              const matches = lines.filter(line => line.startsWith(prefix));
+              return matches.length === 1 && matches[0] === expected;
+            };
+            if (
+              !exactSingleLine("**Finding ID:**", findingLine) ||
+              !exactSingleLine("**Severity:**", severityLine) ||
+              !exactSingleLine("**Correlation:**", correlationLine) ||
+              !exactSingleLine("<sub>🔍 [Investigation Run #", footer)
+            ) {
+              core.setFailed("Investigation comment identity fields are invalid");
+              return;
+            }
+
+            const executiveLines = lines.filter(line =>
+              line.startsWith("**Executive Summary:**")
+            );
+            const executiveSummary =
+              executiveLines.length === 1
+                ? executiveLines[0]
+                    .slice("**Executive Summary:**".length)
+                    .trim()
+                : "";
+            const confidenceLines = lines.filter(line =>
+              line.startsWith("**Confidence:**")
+            );
+            const requiredHeadings = [
+              "### Root Cause",
+              "### Blast Radius",
+              "### Suggested Fix",
+              "### Remediation Status",
+              "### Evidence",
+              "### Related",
+            ];
+            const headingIndexes = requiredHeadings.map(heading => {
+              const matches = lines
+                .map((line, index) => line === heading ? index : -1)
+                .filter(index => index >= 0);
+              return matches.length === 1 ? matches[0] : -1;
             });
-            const labels = issue.labels.map(label =>
+            const separatorIndexes = lines
+              .map((line, index) => line === "---" ? index : -1)
+              .filter(index => index >= 0);
+            const footerIndex = lines.indexOf(footer);
+            const orderedIndexes = [
+              lines.indexOf(findingLine),
+              lines.indexOf(severityLine),
+              lines.indexOf(correlationLine),
+              executiveLines.length === 1
+                ? lines.indexOf(executiveLines[0])
+                : -1,
+              headingIndexes[0],
+              confidenceLines.length === 1
+                ? lines.indexOf(confidenceLines[0])
+                : -1,
+              ...headingIndexes.slice(1),
+              separatorIndexes.length === 1 ? separatorIndexes[0] : -1,
+              footerIndex,
+            ];
+            const indexesAreOrdered = orderedIndexes.every(
+              (index, position) =>
+                index >= 0 &&
+                (position === 0 || index > orderedIndexes[position - 1])
+            );
+            const meaningfulLinesBetween = (start, end) =>
+              lines
+                .slice(start + 1, end)
+                .map(line => line.trim())
+                .filter(Boolean)
+                .filter(line => !/^\{[^}]*\}$/.test(line));
+            const rootCause = meaningfulLinesBetween(
+              headingIndexes[0],
+              orderedIndexes[5]
+            );
+            const blastRadius = meaningfulLinesBetween(
+              headingIndexes[1],
+              headingIndexes[2]
+            );
+            const suggestedFix = meaningfulLinesBetween(
+              headingIndexes[2],
+              headingIndexes[3]
+            );
+            const remediationStatus = meaningfulLinesBetween(
+              headingIndexes[3],
+              headingIndexes[4]
+            );
+            const evidence = meaningfulLinesBetween(
+              headingIndexes[4],
+              headingIndexes[5]
+            );
+            const related = meaningfulLinesBetween(
+              headingIndexes[5],
+              separatorIndexes.length === 1 ? separatorIndexes[0] : -1
+            );
+            if (
+              executiveSummary.length === 0 ||
+              executiveSummary.length > 300 ||
+              confidenceLines.length !== 1 ||
+              !/^\*\*Confidence:\*\* (High|Medium|Low) — \S/.test(
+                confidenceLines[0]
+              ) ||
+              headingIndexes.includes(-1) ||
+              separatorIndexes.length !== 1 ||
+              !indexesAreOrdered ||
+              rootCause.length === 0 ||
+              blastRadius.length === 0 ||
+              !suggestedFix.some(line => /^1\. \S/.test(line)) ||
+              remediationStatus.length === 0 ||
+              !remediationStatus[0].startsWith("Report-only.") ||
+              evidence.length === 0 ||
+              related.length === 0
+            ) {
+              core.setFailed("Investigation comment template is incomplete");
+              return;
+            }
+
+            const dashboard = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: 695,
+            });
+            const labels = dashboard.data.labels.map(label =>
               typeof label === "string" ? label : label.name
             );
             if (
-              issue.pull_request ||
-              issue.state !== "open" ||
-              issue.title !== "🏥 Repository Health Dashboard" ||
+              dashboard.data.state !== "open" ||
+              dashboard.data.title !== "🏥 Repository Health Dashboard" ||
               !labels.includes("devops-health")
             ) {
-              throw new Error("Dashboard issue identity validation failed");
+              core.setFailed("Issue 695 failed canonical dashboard validation");
+              return;
             }
-            const markerMatches = [
-              ...(issue.body || "").matchAll(
-                /<!-- devops-health-state:v1\s*\n([\s\S]*?)\n-->/g
-              ),
-            ];
-            if (markerMatches.length !== 1) {
-              throw new Error("Dashboard state marker validation failed");
-            }
-            let state;
-            try {
-              state = JSON.parse(markerMatches[0][1]);
-            } catch (error) {
-              throw new Error(`Dashboard state JSON is invalid: ${error.message}`);
+
+            let sourceRun;
+            for (let attempt = 0; attempt < 30; attempt += 1) {
+              sourceRun = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: Number(correlationMatch[1]),
+              });
+              if (sourceRun.data.status === "completed") {
+                break;
+              }
+              await new Promise(resolve => setTimeout(resolve, 10000));
             }
             if (
-              !Array.isArray(state.active_findings) ||
-              !state.active_findings.some(
-                finding =>
-                  finding &&
-                  finding.fingerprint === findingId &&
-                  finding.category === findingId.split(":", 1)[0]
-              )
+              sourceRun.data.event !== "schedule" &&
+              sourceRun.data.event !== "workflow_dispatch"
             ) {
-              throw new Error("Finding is not active in the dashboard state");
+              core.setFailed("Investigation source run has an invalid trigger");
+              return;
             }
-            const escapedFindingId = findingId.replace(
-              /[.*+?^${}()|[\]\\]/g,
-              "\\$&"
-            );
-            const escapedCorrelationId = correlationId.replace(
-              /[.*+?^${}()|[\]\\]/g,
-              "\\$&"
-            );
-            const pendingRowPattern = new RegExp(
-              `^\\| \`${escapedFindingId}\` \\| [^|]* \\| [^|]* ` +
-                `\\| ⏳ Pending \\| [^|]* \\| [^\\r\\n]*` +
-                `<!-- correlation:${escapedCorrelationId} --> [^\\r\\n]*\\|$`,
-              "m"
-            );
-            if (!pendingRowPattern.test(issue.body || "")) {
-              throw new Error(
-                "Finding and correlation are not an active pending dashboard row"
+            if (
+              sourceRun.data.status !== "completed" ||
+              sourceRun.data.conclusion !== "success" ||
+              sourceRun.data.path?.split("@")[0] !==
+                ".github/workflows/devops-health-check.lock.yml" ||
+              sourceRun.data.head_repository?.full_name !== `${owner}/${repo}`
+            ) {
+              core.setFailed("Investigation source run failed provenance validation");
+              return;
+            }
+
+            const encodeMarker = value =>
+              encodeURIComponent(value).replace(
+                /[!'()*]/g,
+                character =>
+                  `%${character.charCodeAt(0).toString(16).toUpperCase()}`
               );
+            const fingerprintMarker =
+              `#investigation-fingerprint:${encodeMarker(findingId)})`;
+            const correlationMarker =
+              `#investigation-correlation:${correlation})`;
+            const matchingRows = (dashboard.data.body || "")
+              .split(/\r?\n/)
+              .filter(line =>
+                line.includes(fingerprintMarker) &&
+                line.includes(correlationMarker) &&
+                (
+                  line.includes("⏳ Dispatch pending") ||
+                  line.includes("🔄 Dispatched")
+                )
+              );
+            if (matchingRows.length !== 1) {
+              core.setFailed(
+                "Dashboard does not contain one matching active investigation row"
+              );
+              return;
             }
+
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner,
+                repo,
+                issue_number: 695,
+                per_page: 100,
+              }
+            );
+            const alreadyPublished = comments.some(comment =>
+              comment.user?.login === "github-actions[bot]" &&
+              (comment.body || "").split(/\r?\n/).includes(findingLine) &&
+              (comment.body || "").split(/\r?\n/).includes(correlationLine)
+            );
+            if (alreadyPublished) {
+              core.info("Matching investigation comment already exists");
+              return;
+            }
+
             await github.rest.issues.createComment({
-              ...context.repo,
-              issue_number: issueNumber,
-              body: reportBody,
+              owner,
+              repo,
+              issue_number: 695,
+              body,
             });
 
   safe_outputs:
@@ -2055,7 +2265,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,s.symcb.com,s.symcd.com,security.ubuntu.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUT_JOBS: "{\"publish_investigation_report\":\"\"}"
+          GH_AW_SAFE_OUTPUT_JOBS: "{\"publish_investigation\":\"\"}"
           GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"false\"}}"
           GH_AW_SAFE_OUTPUTS_STAGED: ${{ inputs.dry_run }}
         with:
