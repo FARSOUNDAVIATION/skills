@@ -544,6 +544,8 @@ class TokenFailoverTests(unittest.TestCase):
             health_lock_text,
         )
         self.assertIn("Only github.com links are allowed", health_lock_text)
+        self.assertIn('link.username !== ""', health_lock_text)
+        self.assertIn('link.password !== ""', health_lock_text)
         self.assertIn(
             "Only absolute github.com links are allowed",
             health_lock_text,
@@ -1186,6 +1188,8 @@ class TokenFailoverTests(unittest.TestCase):
             investigate_lock_text,
         )
         self.assertIn("Only github.com links are allowed", investigate_lock_text)
+        self.assertIn('link.username !== ""', investigate_lock_text)
+        self.assertIn('link.password !== ""', investigate_lock_text)
         self.assertIn(
             "Investigation report contains an unsafe mention",
             investigate_lock_text,

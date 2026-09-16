@@ -165,7 +165,9 @@ safe-outputs:
                 }
                 if (
                   link.protocol !== "https:" ||
-                  link.hostname !== "github.com"
+                  link.hostname !== "github.com" ||
+                  link.username !== "" ||
+                  link.password !== ""
                 ) {
                   throw new Error(
                     `Only github.com links are allowed: ${link.href}`
