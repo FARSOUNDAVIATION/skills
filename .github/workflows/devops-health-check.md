@@ -40,6 +40,8 @@ tools:
   edit: false
 
 safe-outputs:
+  report-failure-as-issue: false
+  report-incomplete: false
   update-issue:
     target: "695"
     max: 1
@@ -255,7 +257,10 @@ Derive plugin directories from results matching exactly
 registry:
 - Derive the plugin directory path from the search result path (for example, if `plugin.json` is at `plugins/foo/plugin.json`, the directory is `plugins/foo/`), and separately read the plugin display name from its `name` field.
 - Check if a matching entry exists in `.github/plugin/marketplace.json` where `plugins[].source` resolves to the same directory path (e.g., `"./plugins/foo"`), comparing using the directory derived from the search result rather than the `name` field.
-- If no entry in marketplace.json points to that directory, the plugin is orphaned and will not be discoverable by consumers. Optionally, also emit a separate finding if the `plugin.json` `name` field does not match the directory basename (e.g., `plugins/foo/` with `name: "bar"`).
+- If no entry in marketplace.json points to that directory, the plugin is
+  orphaned and will not be discoverable by consumers. Treat a `plugin.json`
+  `name` mismatch as supporting detail for that same orphan-plugin finding;
+  do not emit a separate finding because no separate fingerprint exists.
 - If code search reaches its result limit, mark I8 as skipped because the plugin
   inventory is incomplete. Do not infer a clean result.
 - 🟡 Warning for each orphan plugin found

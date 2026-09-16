@@ -59,7 +59,8 @@ tools:
 
 safe-outputs:
   staged: ${{ inputs.dry_run }}
-  report-failure-as-issue: ${{ !inputs.dry_run }}
+  report-failure-as-issue: false
+  report-incomplete: false
   add-comment:
     target: "695"
     max: 1

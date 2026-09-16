@@ -38,6 +38,8 @@ tools:
     allowed-repos: public
 
 safe-outputs:
+  report-failure-as-issue: false
+  report-incomplete: false
   update-issue:
     target: "695"
     max: 1

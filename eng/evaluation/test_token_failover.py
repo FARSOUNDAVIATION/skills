@@ -183,6 +183,13 @@ class TokenFailoverTests(unittest.TestCase):
             workflows / "devops-health-groom.lock.yml"
         ).read_text(encoding="utf-8")
         groom_lock = yaml.safe_load(groom_lock_text)
+        for lock_text in (health_lock_text, groom_lock_text):
+            self.assertIn('GH_AW_FAILURE_REPORT_AS_ISSUE: "false"', lock_text)
+            self.assertNotIn("report_incomplete_handler.cjs", lock_text)
+            self.assertNotIn(
+                "GH_AW_REPORT_INCOMPLETE_CREATE_ISSUE",
+                lock_text,
+            )
 
         self.assertIn("Missing prior state is not missing data", health_check)
         self.assertIn("Do not call `missing-data`", health_check)
@@ -191,6 +198,12 @@ class TokenFailoverTests(unittest.TestCase):
             health_check,
         )
         self.assertNotIn("create-issue", health_frontmatter["safe-outputs"])
+        self.assertFalse(
+            health_frontmatter["safe-outputs"]["report-failure-as-issue"]
+        )
+        self.assertFalse(
+            health_frontmatter["safe-outputs"]["report-incomplete"]
+        )
         for output in ("update-issue", "add-comment"):
             self.assertEqual(
                 health_frontmatter["safe-outputs"][output]["target"],
@@ -215,6 +228,7 @@ class TokenFailoverTests(unittest.TestCase):
             self.assertEqual(config["update_issue"]["target"], "695")
             self.assertEqual(config["add_comment"]["target"], "695")
             self.assertNotIn("create_issue", config)
+            self.assertNotIn("create_report_incomplete_issue", config)
         self.assertIn(
             "dispatch-workflow [devops_health_investigate](max:2 total)",
             health_lock_text,
@@ -226,12 +240,19 @@ class TokenFailoverTests(unittest.TestCase):
             groom_frontmatter["safe-outputs"]["update-issue"]["target"],
             "695",
         )
+        self.assertFalse(
+            groom_frontmatter["safe-outputs"]["report-failure-as-issue"]
+        )
+        self.assertFalse(
+            groom_frontmatter["safe-outputs"]["report-incomplete"]
+        )
         self.assertNotIn("hide-comment", groom_frontmatter["safe-outputs"])
         groom_configs = generated_safe_output_configs(groom_lock)
         self.assertEqual(len(groom_configs), 2)
         for config in groom_configs:
             self.assertEqual(config["update_issue"]["target"], "695")
             self.assertNotIn("hide_comment", config)
+            self.assertNotIn("create_report_incomplete_issue", config)
         self.assertNotIn("--allow-all-tools", groom_lock_text)
         self.assertNotIn("--allow-tool write", groom_lock_text)
         self.assertNotIn("shell(yq)", groom_lock_text)
@@ -372,6 +393,9 @@ class TokenFailoverTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
+        investigate_lock_text = investigate_source.with_suffix(
+            ".lock.yml"
+        ).read_text(encoding="utf-8")
 
         trigger = investigate_frontmatter.get("on", investigate_frontmatter.get(True))
         dispatch_inputs = trigger["workflow_dispatch"]["inputs"]
@@ -384,7 +408,10 @@ class TokenFailoverTests(unittest.TestCase):
         )
         self.assertEqual(
             investigate_frontmatter["safe-outputs"]["report-failure-as-issue"],
-            "${{ !inputs.dry_run }}",
+            False,
+        )
+        self.assertFalse(
+            investigate_frontmatter["safe-outputs"]["report-incomplete"]
         )
         self.assertNotIn(
             "create-pull-request",
@@ -398,6 +425,16 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertEqual(len(investigate_configs), 2)
         for config in investigate_configs:
             self.assertEqual(config["add_comment"]["target"], "695")
+            self.assertNotIn("create_report_incomplete_issue", config)
+        self.assertIn(
+            'GH_AW_FAILURE_REPORT_AS_ISSUE: "false"',
+            investigate_lock_text,
+        )
+        self.assertNotIn("report_incomplete_handler.cjs", investigate_lock_text)
+        self.assertNotIn(
+            "GH_AW_REPORT_INCOMPLETE_CREATE_ISSUE",
+            investigate_lock_text,
+        )
         self.assertEqual(
             investigate_frontmatter["network"]["allowed"],
             ["defaults"],
@@ -488,6 +525,18 @@ class TokenFailoverTests(unittest.TestCase):
             "`get_job_logs`",
         ):
             self.assertIn(available_tool, investigate_knowledge)
+
+        workflow_tests = yaml.safe_load(TEST_WORKFLOW.read_text(encoding="utf-8"))
+        triggers = workflow_tests.get("on", workflow_tests.get(True))
+        investigator_knowledge = ".github/aw/shared/devops-investigate.lock.md"
+        self.assertIn(
+            investigator_knowledge,
+            triggers["pull_request"]["paths"],
+        )
+        self.assertIn(
+            investigator_knowledge,
+            triggers["push"]["paths"],
+        )
 
     def test_devops_health_report_only_prompt_rejects_untrusted_actions(self) -> None:
         investigate = (
