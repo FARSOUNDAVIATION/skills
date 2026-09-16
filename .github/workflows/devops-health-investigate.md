@@ -337,6 +337,7 @@ safe-outputs:
                     "occurrences",
                   ]) ||
                   !validFingerprint(finding.fingerprint) ||
+                  finding.fingerprint.length > 300 ||
                   typeof finding.title !== "string" ||
                   finding.title.length === 0 ||
                   finding.title.length > 200 ||
@@ -389,10 +390,14 @@ safe-outputs:
                   throw new Error("Dashboard history schema is invalid");
                 }
               }
+              const activeFinding = stateFindings.get(findingId);
               if (
-                !stateFindings.has(findingId)
+                activeFinding &&
+                activeFinding.severity !== expectedSeverity
               ) {
-                throw new Error("Finding is not active in the dashboard state");
+                throw new Error(
+                  "Active finding severity does not match workflow input"
+                );
               }
               const escapedFindingId = findingId.replace(
                 /[.*+?^${}()|[\]\\]/g,

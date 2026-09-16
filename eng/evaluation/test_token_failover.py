@@ -149,7 +149,6 @@ def run_groom_publisher(
                     "items": [
                         {
                             "type": "publish_groomed_dashboard",
-                            "expected_updated_at": "2026-09-16T10:00:00Z",
                             "investigation_section": section,
                         }
                     ]
@@ -369,6 +368,7 @@ def run_health_publisher(
         output_path = temp_path / "agent-output.json"
         harness_path = temp_path / "publisher-harness.cjs"
         normalized_item = dict(item)
+        normalized_item.pop("expected_updated_at", None)
         if complete_template:
             body = str(normalized_item["dashboard_body"])
             missing_sections = []
@@ -650,7 +650,6 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertEqual(
             set(publisher["inputs"]),
             {
-                "expected_updated_at",
                 "dashboard_body",
                 "daily_comment",
                 "dispatches_json",
@@ -668,7 +667,7 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Validate every target", health_check)
         self.assertIn("Dashboard issue identity validation failed", health_check)
         self.assertIn("publish_health_dashboard` exactly once", health_check)
-        self.assertIn("expected_updated_at", health_check)
+        self.assertNotIn("expected_updated_at", health_check)
         self.assertIn("dispatches_json", health_check)
         self.assertIn("at most 100 items", health_check)
         self.assertIn(
@@ -699,7 +698,9 @@ class TokenFailoverTests(unittest.TestCase):
             for step in publisher_job["steps"]
             if step.get("name") == "Persist dashboard and run follow-ups"
         )
-        self.assertIn("issue.updated_at !== expectedUpdatedAt", publisher_script)
+        self.assertNotIn("expectedUpdatedAt", publisher_script)
+        self.assertIn("rowsToRestore", publisher_script)
+        self.assertIn("Active completed row changed", publisher_script)
         self.assertIn("Only github.com links are allowed", publisher_script)
         self.assertIn("Protocol-relative links are not allowed", publisher_script)
         self.assertIn("requiredDashboardPatterns", publisher_script)
@@ -781,6 +782,10 @@ class TokenFailoverTests(unittest.TestCase):
             "publish-groomed-dashboard"
         ]
         self.assertEqual(
+            set(groom_publisher["inputs"]),
+            {"investigation_section"},
+        )
+        self.assertEqual(
             groom_publisher["if"],
             "needs.detection.outputs.detection_success == 'true'",
         )
@@ -795,13 +800,10 @@ class TokenFailoverTests(unittest.TestCase):
             if step.get("name") == "Verify and publish groomed dashboard"
         )
         self.assertIn(
-            "issue.updated_at !== expectedUpdatedAt",
+            "Dashboard identity validation failed",
             groom_script,
         )
-        self.assertIn(
-            "Dashboard identity or version validation failed",
-            groom_script,
-        )
+        self.assertNotIn("expectedUpdatedAt", groom_script)
         self.assertIn(
             "Active Investigation Results row was not preserved",
             groom_script,
@@ -818,6 +820,7 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Dashboard state root schema is invalid", groom_script)
         self.assertIn("Dashboard active finding URL is invalid", groom_script)
         self.assertIn("Dashboard history schema is invalid", groom_script)
+        self.assertIn("finding.fingerprint.length > 300", groom_script)
         groom_manifest = json.loads(
             groom_lock_text.splitlines()[1].removeprefix("# gh-aw-manifest: ")
         )
@@ -1059,6 +1062,37 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertTrue(accepted["ok"])
         self.assertEqual(
             [call["type"] for call in accepted["calls"]],
+            ["get", "update"],
+        )
+
+        resolved_prior_body = prior_body.replace(
+            json.dumps(
+                {
+                    "active_findings": [
+                        {
+                            "fingerprint": finding_id,
+                            "title": "Evaluation tests failed",
+                            "severity": "critical",
+                            "category": "pipeline",
+                            "url": "https://github.com/dotnet/skills/actions/runs/500",
+                            "first_seen": "2026-09-16",
+                            "occurrences": 1,
+                        }
+                    ],
+                    "history": [],
+                },
+                separators=(",", ":"),
+            ),
+            '{"active_findings":[],"history":[]}',
+        )
+        retained_after_resolution = run_groom_publisher(
+            self,
+            prior_body=resolved_prior_body,
+            section=section,
+        )
+        self.assertTrue(retained_after_resolution["ok"])
+        self.assertEqual(
+            [call["type"] for call in retained_after_resolution["calls"]],
             ["get", "update"],
         )
 
@@ -1315,6 +1349,26 @@ class TokenFailoverTests(unittest.TestCase):
             ["get-comment"],
         )
 
+        changed_done_body = body.replace(
+            "[Tests were fixed]",
+            "[Different summary]",
+        )
+        changed_done = run_health_publisher(
+            self,
+            {
+                **item,
+                "dashboard_body": changed_done_body,
+            },
+            initial_body=body,
+            existing_comments=[comment],
+        )
+        self.assertFalse(changed_done["ok"])
+        self.assertIn("Active completed row changed", changed_done["error"])
+        self.assertEqual(
+            [call["type"] for call in changed_done["calls"]],
+            ["get-comment", "get"],
+        )
+
     def test_devops_health_publisher_preserves_pending_dispatches(self) -> None:
         findings = [
             {
@@ -1491,6 +1545,27 @@ class TokenFailoverTests(unittest.TestCase):
             [call["type"] for call in result["calls"]],
             ["get"],
         )
+
+        resolved_body = empty_table_body.replace(
+            state_marker,
+            '<!-- devops-health-state:v1\n{"active_findings":[],"history":[]}\n-->',
+        )
+        preserved = run_health_publisher(
+            self,
+            {
+                "dashboard_body": resolved_body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": "[]",
+            },
+            initial_body=body,
+        )
+        self.assertTrue(preserved["ok"])
+        persisted_body = next(
+            call["body"]
+            for call in preserved["calls"]
+            if call["type"] == "update"
+        )
+        self.assertIn("<!-- correlation:hc-101-1 -->", persisted_body)
 
     def test_devops_health_publisher_reconciles_before_budget(self) -> None:
         findings = [
@@ -1984,6 +2059,10 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn(
             "If `dry_run` is true, do not call `publish-investigation-report`",
             investigate,
+        )
+        self.assertIn(
+            "finding.fingerprint.length > 300",
+            investigation_publisher_script(),
         )
 
         valid = run_investigation_publisher(self)

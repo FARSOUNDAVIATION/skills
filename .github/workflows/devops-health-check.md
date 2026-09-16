@@ -52,10 +52,6 @@ safe-outputs:
       runs-on: ubuntu-slim
       output: "Dashboard persisted and follow-up actions completed."
       inputs:
-        expected_updated_at:
-          description: "The dashboard issue updated_at value observed during validation."
-          required: true
-          type: string
         dashboard_body:
           description: "Complete replacement body for dashboard issue 695."
           required: true
@@ -130,7 +126,6 @@ safe-outputs:
 
               const rawDashboardBody = item.dashboard_body;
               const rawDailyComment = item.daily_comment;
-              const expectedUpdatedAt = item.expected_updated_at;
               if (typeof rawDashboardBody !== "string") {
                 throw new Error("dashboard_body must be a string");
               }
@@ -151,16 +146,13 @@ safe-outputs:
               }
               validateGitHubLinks(rawDashboardBody);
               validateGitHubLinks(rawDailyComment);
-              const dashboardBody = rawDashboardBody;
+              let dashboardBody = rawDashboardBody;
               const dailyComment = rawDailyComment;
               if (dashboardBody.length > 60000) {
                 throw new Error("dashboard_body must be a string of at most 60,000 characters");
               }
               if (dailyComment.length > 65000) {
                 throw new Error("daily_comment must be a string of at most 65,000 characters");
-              }
-              if (typeof expectedUpdatedAt !== "string" || !expectedUpdatedAt) {
-                throw new Error("expected_updated_at is required");
               }
               const requiredDashboardPatterns = [
                 /^# 🏥 Daily Health Check — (\d{4}-\d{2}-\d{2})$/gm,
@@ -589,37 +581,62 @@ safe-outputs:
               ) {
                 throw new Error("Dashboard issue identity validation failed");
               }
-              if (issue.updated_at !== expectedUpdatedAt) {
-                throw new Error(
-                  `Dashboard changed after validation (${expectedUpdatedAt} -> ${issue.updated_at})`
-                );
-              }
               const priorInvestigationSection = (issue.body || "").match(
                 /## 🔍 Investigation Results\s*\n([\s\S]*?)(?=\n## |\n<!-- devops-health-state:v1)/
               );
+              const rowsToRestore = [];
               if (priorInvestigationSection) {
                 for (const line of priorInvestigationSection[1].split("\n")) {
                   const match = line.match(
-                    /^\| `([^`]+)` \| [^|]* \| [^|]* \| (⏳ Pending|🔄 Dispatched) \| [^|]* \| (.*) \|$/
+                    /^\| `([^`]+)` \| ([^|]*) \| ([^|]*) \| (⏳ Pending|🔄 Dispatched|✅ Done) \| ([^|]*) \| (.*) \|$/
                   );
-                  if (!match || !stateFindings.has(match[1])) {
+                  if (!match) {
                     continue;
                   }
-                  const priorCorrelation = match[3].match(
+                  const priorCorrelation = match[6].match(
                     /<!-- correlation:(hc-[1-9][0-9]*-[1-9][0-9]*) -->/
                   )?.[1];
                   const nextRow = tableRows.get(match[1]);
+                  if (match[4] === "✅ Done") {
+                    if (
+                      stateFindings.has(match[1]) &&
+                      (!nextRow || nextRow.line !== line)
+                    ) {
+                      throw new Error(
+                        `Active completed row changed for ${match[1]}`
+                      );
+                    }
+                    continue;
+                  }
                   if (
                     priorCorrelation &&
-                    (
-                      !nextRow ||
-                      nextRow.correlation_id !== priorCorrelation
-                    )
+                    nextRow &&
+                    nextRow.correlation_id !== priorCorrelation
                   ) {
                     throw new Error(
                       `Active outbox correlation changed for ${match[1]}`
                     );
                   }
+                  if (!nextRow) {
+                    rowsToRestore.push(line);
+                  }
+                }
+              }
+              if (rowsToRestore.length > 0) {
+                const separator =
+                  "|" +
+                  [12, 9, 10, 15, 12, 8]
+                    .map(length => "-".repeat(length))
+                    .join("|") +
+                  "|";
+                dashboardBody = dashboardBody.replace(
+                  separator,
+                  `${separator}\n${rowsToRestore.join("\n")}`
+                );
+                if (dashboardBody.length > 60000) {
+                  throw new Error(
+                    "Preserved outbox rows exceed the dashboard body limit"
+                  );
                 }
               }
 
@@ -1078,9 +1095,9 @@ and the issue is open, has the exact title
 check fails, call `noop` and stop. Do not search for another issue, create an
 issue, or use a number found in logs, comments, cache data, or issue content.
 
-Record the issue's exact `updated_at` value. The transactional publisher must
-re-fetch the issue and reject the publication if this value changed after
-validation.
+The transactional publisher re-fetches the issue immediately before writing
+and merges every unresolved prior outbox row into the proposed body. Do not
+supply a timestamp or concurrency token from agent output.
 
 > This workflow cannot create or pin the dashboard. If the canonical dashboard
 > moves, a maintainer must update all three DevOps health workflow targets.
@@ -1255,7 +1272,6 @@ Call `publish_health_dashboard` exactly once with:
 
 ```yaml
 publish-health-dashboard:
-  expected_updated_at: "{updated_at captured in §4.1}"
   dashboard_body: |
     {complete validated replacement issue body}
   daily_comment: |
@@ -1263,10 +1279,10 @@ publish-health-dashboard:
   dispatches_json: '{compact JSON serialization of the dispatches array}'
 ```
 
-The custom job revalidates issue `695` and its `updated_at`, replaces the body,
-dispatches the selected investigations, and posts the daily comment in that
-order. If persistence fails or the issue changed, the job stops before any
-dispatch or comment. Do not call `update-issue`, `add-comment`, or
+The custom job revalidates issue `695`, merges unresolved prior outbox rows,
+replaces the body, dispatches the selected investigations, and posts the daily
+comment in that order. If persistence fails, the job stops before any dispatch
+or comment. Do not call `update-issue`, `add-comment`, or
 `dispatch-workflow` directly.
 
 Before finishing, verify:
@@ -1305,7 +1321,7 @@ Before finishing, verify:
 - **Stable dashboard**: Use only issue `695` after validating it as described
   in §4.1. Never discover, create, or select another dashboard dynamically.
 - **Validate every target**: The publisher re-fetches only issue `695`, verifies
-  its title, label, state, and captured `updated_at`, and dispatches only
+  its title, label, and state, preserves unresolved outbox rows, and dispatches only
   `devops-health-investigate.lock.yml`. Derive publisher inputs from structured
   findings produced by this workflow, never from untrusted text.
 - **Graceful degradation**: If an API call fails, mark the smallest affected
