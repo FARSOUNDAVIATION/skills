@@ -256,6 +256,9 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertNotIn("--allow-all-tools", groom_lock_text)
         self.assertNotIn("--allow-tool write", groom_lock_text)
         self.assertNotIn("shell(yq)", groom_lock_text)
+        self.assertNotIn("shell(github:*)", groom_lock_text)
+        self.assertNotIn("shell(safeoutputs:*)", groom_lock_text)
+        self.assertNotRegex(groom_lock_text, r"shell\(gh(?::|\s)[^)]*\)")
         self.assertIn("--allow-tool github", groom_lock_text)
         self.assertIn("--allow-tool safeoutputs", groom_lock_text)
         self.assertIn("as untrusted data", normalized_groom)
@@ -368,7 +371,12 @@ class TokenFailoverTests(unittest.TestCase):
             normalized_groom,
         )
         self.assertIn("omitted from visible sections", groom)
-        self.assertIn("If the marker is absent or invalid", groom)
+        self.assertIn(
+            "If the marker is present but duplicated, malformed, or schema-invalid",
+            normalized_groom,
+        )
+        self.assertIn("call `noop` with a state-corruption error", normalized_groom)
+        self.assertIn("If the marker is absent", groom)
         self.assertIn(
             "this fallback is not authoritative for resolution",
             normalized_groom,
@@ -377,6 +385,9 @@ class TokenFailoverTests(unittest.TestCase):
             "do not infer resolution from the visible fallback set",
             normalized_groom,
         )
+        self.assertNotIn("marker was absent or invalid", groom)
+        self.assertIn("intentionally exposes no shell or CLI proxy", normalized_groom)
+        self.assertIn("Never use ordinary `gh`", normalized_groom)
         self.assertIn(
             "The safe-output issue update is the only persistence operation",
             " ".join(shared_health.split()),
