@@ -240,7 +240,7 @@ comments collected in Step 2:
    ## 🔍 Investigation Results
 
    > Deep investigations are dispatched for new critical/warning findings.
-   > The [grooming workflow](../workflows/devops-health-groom.md) links results ~3 hours after this run.
+   > The [grooming workflow](https://github.com/${{ github.repository }}/blob/${{ github.event.repository.default_branch }}/.github/workflows/devops-health-groom.md) links results ~3 hours after this run.
 
    | Finding ID | Finding | Severity | Investigation | First Seen | Result |
    |------------|---------|----------|---------------|------------|--------|
@@ -295,7 +295,7 @@ The `body` field must contain **only** the Investigation Results island — star
 ## 🔍 Investigation Results
 
 > Deep investigations are dispatched for new critical/warning findings.
-> The [grooming workflow](../workflows/devops-health-groom.md) links results ~3 hours after this run.
+> The [grooming workflow](https://github.com/${{ github.repository }}/blob/${{ github.event.repository.default_branch }}/.github/workflows/devops-health-groom.md) links results ~3 hours after this run.
 
 | Finding ID | Finding | Severity | Investigation | First Seen | Result |
 |------------|---------|----------|---------------|------------|--------|

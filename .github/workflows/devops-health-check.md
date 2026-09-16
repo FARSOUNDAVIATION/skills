@@ -1111,7 +1111,7 @@ Replace the entire issue body with the following structure:
 ## 🔍 Investigation Results
 
 > Deep investigations are dispatched for new critical/warning findings.
-> The [grooming workflow](../workflows/devops-health-groom.md) links results ~3 hours after this run.
+> The [grooming workflow](https://github.com/${{ github.repository }}/blob/${{ github.event.repository.default_branch }}/.github/workflows/devops-health-groom.md) links results ~3 hours after this run.
 
 | Finding ID | Finding | Severity | Investigation | First Seen | Result |
 |------------|---------|----------|---------------|------------|--------|
@@ -1296,7 +1296,7 @@ Before finishing, verify:
   tools. Process API responses and dashboard state in memory. Do not create
   scripts or intermediate files.
 - **CRITICAL — Publisher body must be inline**: The `dashboard_body` field must contain the **complete, literal issue body text**. NEVER write it to a file or use a shell reference.
-- **CRITICAL — Investigation Results section**: The `## 🔍 Investigation Results` section MUST always appear in the issue body template. The downstream [grooming workflow](../workflows/devops-health-groom.md) manages this section via a `replace-island` block. Preserve existing active rows by fingerprint and append new `⏳ Pending` rows with their exact fingerprints and correlation markers. Do NOT wrap the section in island markers yourself.
+- **CRITICAL — Investigation Results section**: The `## 🔍 Investigation Results` section MUST always appear in the issue body template. The downstream [grooming workflow](https://github.com/${{ github.repository }}/blob/${{ github.event.repository.default_branch }}/.github/workflows/devops-health-groom.md) manages this section via a `replace-island` block. Preserve existing active rows by fingerprint and append new `⏳ Pending` rows with their exact fingerprints and correlation markers. Do NOT wrap the section in island markers yourself.
 - **Be data-driven**: Include specific numbers, durations, percentages, and links.
 - **Be precise with fingerprints**: Use the exact fingerprint formulas from the knowledge file. Consistency is critical — the same finding MUST produce the same fingerprint across runs.
 - **First run handling**: If the validated dashboard body has no valid previous

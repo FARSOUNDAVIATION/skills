@@ -578,6 +578,14 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Only github.com links are allowed", publisher_script)
         self.assertIn("Protocol-relative links are not allowed", publisher_script)
         self.assertIn("requiredDashboardPatterns", publisher_script)
+        self.assertNotIn(
+            "(../workflows/devops-health-groom.md)",
+            health_check,
+        )
+        self.assertNotIn(
+            "(../workflows/devops-health-groom.md)",
+            groom,
+        )
         self.assertIn("Dashboard state root schema is invalid", publisher_script)
         self.assertIn("Dashboard active finding schema is invalid", publisher_script)
         self.assertIn("Dashboard history schema is invalid", publisher_script)
