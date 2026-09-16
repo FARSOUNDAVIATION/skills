@@ -111,7 +111,9 @@ safe-outputs:
                 typeof item.body !== "string" ||
                 !item.body.startsWith("# 🏥 Daily Health Check — ") ||
                 countToken(item.body, stateToken) !== 1 ||
-                countToken(item.body, rowsToken) !== 1
+                countToken(item.body, rowsToken) !== 1 ||
+                item.body.includes("<!-- devops-health-state:v1") ||
+                item.body.includes("<!-- devops-health-investigation-results:")
               ) {
                 core.setFailed("Dashboard body is missing required publication placeholders");
                 return;
@@ -175,26 +177,6 @@ safe-outputs:
                 core.setFailed("Repository default branch is unavailable");
                 return;
               }
-              const priorOutbox = new Map();
-              for (const line of (dashboard.data.body || "").split(/\r?\n/)) {
-                const fingerprintMatch = line.match(
-                  /#investigation-fingerprint:([^)]*)\)/
-                );
-                const correlationMatch = line.match(
-                  /#investigation-correlation:(hc-\d{4}-\d{2}-\d{2}-\d+-\d+)\)/
-                );
-                if (fingerprintMatch && correlationMatch) {
-                  try {
-                    priorOutbox.set(
-                      decodeURIComponent(fingerprintMatch[1]),
-                      correlationMatch[1]
-                    );
-                  } catch {
-                    core.setFailed("Dashboard contains an invalid outbox marker");
-                    return;
-                  }
-                }
-              }
               const exactKeys = (value, keys) =>
                 value !== null &&
                 typeof value === "object" &&
@@ -242,6 +224,76 @@ safe-outputs:
                   url.search === "" &&
                   /^#issuecomment-\d+$/.test(url.hash)
                 );
+              };
+              const validateCompletedComment = async row => {
+                const url = new URL(row.result_url);
+                const commentId = Number(
+                  url.hash.slice("#issuecomment-".length)
+                );
+                if (!Number.isSafeInteger(commentId) || commentId <= 0) {
+                  throw new Error("A completed investigation row has an invalid comment ID");
+                }
+                const response = await github.rest.issues.getComment({
+                  owner,
+                  repo,
+                  comment_id: commentId,
+                });
+                const comment = response.data;
+                const commentBody = comment.body || "";
+                const lines = commentBody.split(/\r?\n/);
+                const findingLine = `**Finding ID:** \`${row.fingerprint}\``;
+                const correlationLine = `**Correlation:** ${row.correlation_id}`;
+                const summaryLine =
+                  `**Executive Summary:** ${row.result_summary}`;
+                const runFooterPattern = new RegExp(
+                  `^<sub>🔍 \\[Investigation Run #\\d+\\]\\(` +
+                  `https://github\\.com/${owner}/${repo}/actions/runs/(\\d+)\\)` +
+                  ` · Dispatched by health check · ${row.correlation_id}</sub>$`
+                );
+                const runFooterLines = lines.filter(line =>
+                  line.startsWith("<sub>🔍 [Investigation Run #")
+                );
+                const runFooterMatch =
+                  runFooterLines.length === 1 &&
+                  runFooterPattern.exec(runFooterLines[0]);
+                if (
+                  comment.user?.login !== "github-actions[bot]" ||
+                  comment.issue_url !==
+                    `https://api.github.com/repos/${owner}/${repo}/issues/695` ||
+                  comment.html_url !== row.result_url ||
+                  !commentBody.startsWith("## 🔍 Investigation:") ||
+                  lines.filter(line => line.startsWith("**Finding ID:**")).length !== 1 ||
+                  !lines.includes(findingLine) ||
+                  lines.filter(line => line.startsWith("**Correlation:**")).length !== 1 ||
+                  !lines.includes(correlationLine) ||
+                  lines.filter(
+                    line => line.startsWith("**Executive Summary:**")
+                  ).length !== 1 ||
+                  !lines.includes(summaryLine) ||
+                  !runFooterMatch
+                ) {
+                  throw new Error(
+                    "A completed investigation row does not match its trusted comment"
+                  );
+                }
+                const run = await github.rest.actions.getWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: Number(runFooterMatch[1]),
+                });
+                if (
+                  run.data.event !== "workflow_dispatch" ||
+                  run.data.conclusion !== "success" ||
+                  run.data.display_title !==
+                    `DevOps Health Investigation — ${row.correlation_id}` ||
+                  run.data.path?.split("@")[0] !==
+                    ".github/workflows/devops-health-investigate.lock.yml" ||
+                  run.data.head_repository?.full_name !== `${owner}/${repo}`
+                ) {
+                  throw new Error(
+                    "A completed investigation row does not match its trusted workflow run"
+                  );
+                }
               };
               const validResourceUrlForType = (value, findingType) => {
                 if (!validRepositoryUrl(value)) {
@@ -352,75 +404,126 @@ safe-outputs:
                 return JSON.parse(match[1]);
               };
 
+              const validateState = (candidate, source) => {
+                if (
+                  !exactKeys(candidate, ["active_findings", "history"]) ||
+                  !Array.isArray(candidate.active_findings) ||
+                  candidate.active_findings.length > 100 ||
+                  !Array.isArray(candidate.history) ||
+                  candidate.history.length > 14
+                ) {
+                  throw new Error(`${source} has an invalid top-level schema`);
+                }
+                const findings = new Map();
+                for (const finding of candidate.active_findings) {
+                  if (
+                    !exactKeys(finding, [
+                      "category",
+                      "fingerprint",
+                      "first_seen",
+                      "occurrences",
+                      "severity",
+                      "title",
+                      "url",
+                    ]) ||
+                    !validFingerprint(finding.fingerprint) ||
+                    !allowedTypes.has(finding.category) ||
+                    !finding.fingerprint.startsWith(`${finding.category}:`) ||
+                    !allowedSeverities.has(finding.severity) ||
+                    finding.severity !==
+                      expectedSeverityForFingerprint(finding.fingerprint) ||
+                    typeof finding.title !== "string" ||
+                    finding.title.length === 0 ||
+                    finding.title.length > 200 ||
+                    !validRepositoryUrl(finding.url) ||
+                    !validDate(finding.first_seen) ||
+                    !validCount(finding.occurrences) ||
+                    findings.has(finding.fingerprint)
+                  ) {
+                    throw new Error(`${source} contains an invalid active finding`);
+                  }
+                  findings.set(finding.fingerprint, finding);
+                }
+                for (const history of candidate.history) {
+                  if (
+                    !exactKeys(history, [
+                      "by_severity",
+                      "date",
+                      "existing_count",
+                      "metrics",
+                      "new_count",
+                      "resolved_count",
+                    ]) ||
+                    !validDate(history.date) ||
+                    !validCount(history.new_count) ||
+                    !validCount(history.existing_count) ||
+                    !validCount(history.resolved_count) ||
+                    !validNumericObject(history.by_severity) ||
+                    !validNumericObject(history.metrics)
+                  ) {
+                    throw new Error(`${source} contains an invalid history entry`);
+                  }
+                }
+                return findings;
+              };
+
+              const currentBody = dashboard.data.body || "";
+              const currentStateMatches = [
+                ...currentBody.matchAll(
+                  /<!-- devops-health-state:v1\r?\n([\s\S]*?)\r?\n-->/g
+                ),
+              ];
+              const currentStateTokenCount =
+                currentBody.split("<!-- devops-health-state:v1").length - 1;
+              if (currentStateTokenCount > 1) {
+                core.setFailed("Existing dashboard state marker is duplicated");
+                return;
+              }
+              if (currentStateTokenCount !== currentStateMatches.length) {
+                core.setFailed("Existing dashboard state marker is malformed");
+                return;
+              }
+              if (currentStateMatches.length === 1) {
+                try {
+                  validateState(
+                    JSON.parse(currentStateMatches[0][1]),
+                    "Existing dashboard state"
+                  );
+                } catch (error) {
+                  core.setFailed(error.message);
+                  return;
+                }
+              }
+
+              const priorOutbox = new Map();
+              for (const line of currentBody.split(/\r?\n/)) {
+                const fingerprintMatch = line.match(
+                  /#investigation-fingerprint:([^)]*)\)/
+                );
+                const correlationMatch = line.match(
+                  /#investigation-correlation:(hc-\d{4}-\d{2}-\d{2}-\d+-\d+)\)/
+                );
+                if (fingerprintMatch && correlationMatch) {
+                  try {
+                    priorOutbox.set(
+                      decodeURIComponent(fingerprintMatch[1]),
+                      correlationMatch[1]
+                    );
+                  } catch {
+                    core.setFailed("Dashboard contains an invalid outbox marker");
+                    return;
+                  }
+                }
+              }
+
               let state;
+              let stateFindings;
               try {
                 state = parseFencedJson(item.state_json, "state_json", 100000);
+                stateFindings = validateState(state, "Dashboard state");
               } catch (error) {
                 core.setFailed(error.message);
                 return;
-              }
-              if (
-                !exactKeys(state, ["active_findings", "history"]) ||
-                !Array.isArray(state.active_findings) ||
-                state.active_findings.length > 100 ||
-                !Array.isArray(state.history) ||
-                state.history.length > 14
-              ) {
-                core.setFailed("Dashboard state has an invalid top-level schema");
-                return;
-              }
-
-              const stateFindings = new Map();
-              for (const finding of state.active_findings) {
-                if (
-                  !exactKeys(finding, [
-                    "category",
-                    "fingerprint",
-                    "first_seen",
-                    "occurrences",
-                    "severity",
-                    "title",
-                    "url",
-                  ]) ||
-                  !validFingerprint(finding.fingerprint) ||
-                  !allowedTypes.has(finding.category) ||
-                  !finding.fingerprint.startsWith(`${finding.category}:`) ||
-                  !allowedSeverities.has(finding.severity) ||
-                  finding.severity !==
-                    expectedSeverityForFingerprint(finding.fingerprint) ||
-                  typeof finding.title !== "string" ||
-                  finding.title.length === 0 ||
-                  finding.title.length > 200 ||
-                  !validRepositoryUrl(finding.url) ||
-                  !validDate(finding.first_seen) ||
-                  !validCount(finding.occurrences) ||
-                  stateFindings.has(finding.fingerprint)
-                ) {
-                  core.setFailed("Dashboard state contains an invalid active finding");
-                  return;
-                }
-                stateFindings.set(finding.fingerprint, finding);
-              }
-              for (const history of state.history) {
-                if (
-                  !exactKeys(history, [
-                    "by_severity",
-                    "date",
-                    "existing_count",
-                    "metrics",
-                    "new_count",
-                    "resolved_count",
-                  ]) ||
-                  !validDate(history.date) ||
-                  !validCount(history.new_count) ||
-                  !validCount(history.existing_count) ||
-                  !validCount(history.resolved_count) ||
-                  !validNumericObject(history.by_severity) ||
-                  !validNumericObject(history.metrics)
-                ) {
-                  core.setFailed("Dashboard state contains an invalid history entry");
-                  return;
-                }
               }
 
               let investigationRows;
@@ -494,14 +597,17 @@ safe-outputs:
                 const validCorrelation =
                   /^hc-\d{4}-\d{2}-\d{2}-\d+-\d+$/.test(row.correlation_id);
                 if (
-                  (row.status === "dispatching" && !validCorrelation) ||
+                  (
+                    ["dispatching", "done"].includes(row.status) &&
+                    !validCorrelation
+                  ) ||
                   (
                     row.status === "dispatched" &&
                     row.correlation_id !== "" &&
                     !validCorrelation
                   ) ||
                   (
-                    !["dispatching", "dispatched"].includes(row.status) &&
+                    !["dispatching", "dispatched", "done"].includes(row.status) &&
                     row.correlation_id !== ""
                   )
                 ) {
@@ -517,6 +623,14 @@ safe-outputs:
                 ) {
                   core.setFailed("A completed investigation row has an invalid result");
                   return;
+                }
+                if (row.status === "done") {
+                  try {
+                    await validateCompletedComment(row);
+                  } catch (error) {
+                    core.setFailed(error.message);
+                    return;
+                  }
                 }
                 if (
                   row.status !== "done" &&
@@ -685,6 +799,24 @@ safe-outputs:
               const publishedBody = item.body
                 .replace(stateToken, () => stateMarker)
                 .replace(rowsToken, () => renderRows(true));
+              for (const renderedBody of [outboxBody, publishedBody]) {
+                const renderedStateMatches = [
+                  ...renderedBody.matchAll(
+                    /<!-- devops-health-state:v1\r?\n([\s\S]*?)\r?\n-->/g
+                  ),
+                ];
+                if (
+                  renderedStateMatches.length !== 1 ||
+                  countToken(renderedBody, "<!-- devops-health-state:v1") !== 1 ||
+                  renderedBody.includes(stateToken) ||
+                  renderedBody.includes(rowsToken)
+                ) {
+                  core.setFailed(
+                    "Rendered dashboard body has invalid publication markers"
+                  );
+                  return;
+                }
+              }
               if (outboxBody.length > 60000 || publishedBody.length > 60000) {
                 core.setFailed("Rendered dashboard body exceeds 60000 characters");
                 return;
@@ -1194,8 +1326,10 @@ Each row has exactly `fingerprint`, `status`, `correlation_id`,
 `result_summary`, and `result_url`. Status is `pending`, `dispatching`,
 `dispatched`, `done`, or `skipped`. Keep both result fields empty unless status
 is `done`; for a done row, copy the bounded summary and canonical-dashboard
-comment URL. Use an empty correlation except for `dispatching` and
-`dispatched`. A selected dispatch must use `dispatching` with the same
+comment URL, and preserve the exact correlation from that matching
+`github-actions[bot]` investigation comment. Use an empty correlation except
+for `dispatching`, `dispatched`, and `done`. A selected dispatch must use
+`dispatching` with the same
 correlation as its dispatch input. Preserve and reuse that correlation when
 retrying an existing `dispatching` outbox row. The
 privileged job derives title, severity, and first-seen date from `state_json`

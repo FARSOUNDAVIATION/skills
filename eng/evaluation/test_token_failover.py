@@ -303,6 +303,14 @@ class TokenFailoverTests(unittest.TestCase):
             health_lock_text,
         )
         self.assertIn(
+            'item.body.includes("<!-- devops-health-state:v1")',
+            health_lock_text,
+        )
+        self.assertIn(
+            "Rendered dashboard body has invalid publication markers",
+            health_lock_text,
+        )
+        self.assertIn(
             "must be one exact fenced JSON block",
             health_lock_text,
         )
@@ -352,9 +360,18 @@ class TokenFailoverTests(unittest.TestCase):
             health_lock_text,
         )
         self.assertIn(
-            "Dashboard state contains an invalid active finding",
+            "contains an invalid active finding",
             health_lock_text,
         )
+        self.assertIn(
+            "Existing dashboard state marker is duplicated",
+            health_lock_text,
+        )
+        self.assertIn(
+            "Existing dashboard state marker is malformed",
+            health_lock_text,
+        )
+        self.assertIn("validateState(", health_lock_text)
         self.assertIn(
             "A dispatch item does not match persisted dashboard state",
             health_lock_text,
@@ -438,7 +455,10 @@ class TokenFailoverTests(unittest.TestCase):
         groom_job = groom_frontmatter["safe-outputs"]["jobs"][
             "publish-groomed-dashboard"
         ]
-        self.assertEqual(groom_job["permissions"], {"issues": "write"})
+        self.assertEqual(
+            groom_job["permissions"],
+            {"actions": "read", "issues": "write"},
+        )
         self.assertEqual(set(groom_job["inputs"]), {"rows_json"})
         self.assertIn(
             "needs.detection.outputs.detection_success == 'true'",
@@ -471,14 +491,36 @@ class TokenFailoverTests(unittest.TestCase):
             "A groomed row is not active in dashboard state",
             groom_lock_text,
         )
+        self.assertIn("Dashboard state marker is duplicated", groom_lock_text)
+        self.assertIn("Dashboard state marker is malformed", groom_lock_text)
+        self.assertIn(
+            "Dashboard state contains an invalid history entry",
+            groom_lock_text,
+        )
+        self.assertIn("expectedSeverityForFingerprint", groom_lock_text)
         self.assertIn(
             "url.pathname === `/${owner}/${repo}/issues/695`",
             groom_lock_text,
         )
         self.assertIn(
-            'row.status === "dispatching" && !validCorrelation',
+            '["dispatching", "done"].includes(row.status)',
             groom_lock_text,
         )
+        for lock_text in (health_lock_text, groom_lock_text):
+            self.assertIn("github.rest.issues.getComment", lock_text)
+            self.assertIn(
+                'comment.user?.login !== "github-actions[bot]"',
+                lock_text,
+            )
+            self.assertIn("github.rest.actions.getWorkflowRun", lock_text)
+            self.assertIn(
+                '".github/workflows/devops-health-investigate.lock.yml"',
+                lock_text,
+            )
+            self.assertIn(
+                "does not match its trusted workflow run",
+                lock_text,
+            )
         self.assertIn(
             "investigation-fingerprint:${encodeMarker(row.fingerprint)}",
             groom_lock_text,
@@ -508,6 +550,10 @@ class TokenFailoverTests(unittest.TestCase):
             normalized_groom,
         )
         self.assertIn("do not stop based on comment age", normalized_groom)
+        self.assertIn(
+            "If absent, call `noop` with a state-not-initialized message",
+            groom,
+        )
         self.assertIn("Integrity filtering can remove items", groom)
         self.assertIn(
             "Apply the 30-day limit only to unrelated comments",
@@ -696,14 +742,17 @@ class TokenFailoverTests(unittest.TestCase):
             normalized_groom,
         )
         self.assertIn("call `noop` with a state-corruption error", normalized_groom)
-        self.assertIn("If the marker is absent", groom)
         self.assertIn(
-            "this fallback is not authoritative for resolution",
+            "If the marker is absent, call `noop` and stop without publication",
             normalized_groom,
         )
         self.assertIn(
-            "do not infer resolution from the visible fallback set",
+            "A missing marker has already stopped the workflow",
             normalized_groom,
+        )
+        self.assertNotIn(
+            "fall back to the visible **🆕 New Findings**",
+            groom,
         )
         self.assertNotIn("marker was absent or invalid", groom)
         self.assertIn("intentionally exposes no shell or CLI proxy", normalized_groom)

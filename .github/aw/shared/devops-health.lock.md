@@ -293,6 +293,10 @@ dispatch correlation before publication. The privileged job persists that
 retryable outbox row before dispatch and changes it to `🔄 Dispatched` only
 after success or reconciliation. Preserve and reuse the correlation from an
 existing dispatching row. Never append a second row for the same fingerprint.
+When an investigation becomes `done`, preserve its valid correlation and
+accept the result only when the referenced issue-695 comment is authored by
+`github-actions[bot]` and contains exactly matching finding, correlation, and
+executive-summary fields.
 **Priority order when cap is hit:**
 1. 🔴 Critical findings first
 2. Older pending findings before new findings at the same severity
