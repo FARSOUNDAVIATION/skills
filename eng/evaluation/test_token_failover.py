@@ -214,6 +214,7 @@ def run_investigation_publisher(
     actor: str = "github-actions[bot]",
     report_body: str | None = None,
     dashboard_body_override: str | None = None,
+    expected_severity: str = "critical",
 ) -> dict[str, object]:
     node = shutil.which("node")
     if not node:
@@ -332,7 +333,7 @@ const context = {{
                 "GH_AW_AGENT_OUTPUT": str(output_path),
                 "EXPECTED_FINDING_ID": finding_id,
                 "EXPECTED_CORRELATION_ID": correlation_id,
-                "EXPECTED_SEVERITY": "critical",
+                "EXPECTED_SEVERITY": expected_severity,
             }
         )
         completed = subprocess.run(
@@ -805,6 +806,7 @@ class TokenFailoverTests(unittest.TestCase):
             "Active Investigation Results row was not preserved",
             groom_script,
         )
+        self.assertIn("Malformed Investigation Results row", groom_script)
         self.assertIn(
             "Done row comment verification failed",
             groom_script,
@@ -1097,6 +1099,18 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Dashboard active finding is invalid", invalid["error"])
         self.assertEqual(
             [call["type"] for call in invalid["calls"]],
+            ["get"],
+        )
+
+        malformed = run_groom_publisher(
+            self,
+            prior_body=prior_body,
+            section=section + "\n| malformed | row |",
+        )
+        self.assertFalse(malformed["ok"])
+        self.assertIn("Malformed Investigation Results row", malformed["error"])
+        self.assertEqual(
+            [call["type"] for call in malformed["calls"]],
             ["get"],
         )
 
@@ -2023,6 +2037,14 @@ class TokenFailoverTests(unittest.TestCase):
             [call["type"] for call in unsafe["calls"]],
             ["get-run"],
         )
+
+        invalid_severity = run_investigation_publisher(
+            self,
+            expected_severity="critical|.*",
+        )
+        self.assertFalse(invalid_severity["ok"])
+        self.assertIn("Investigation severity is invalid", invalid_severity["error"])
+        self.assertEqual(invalid_severity["calls"], [])
 
         invalid_state_body = """# 🏥 Daily Health Check — 2026-09-16
 

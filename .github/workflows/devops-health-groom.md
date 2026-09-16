@@ -143,11 +143,25 @@ safe-outputs:
                 const rows = new Map();
                 const correlations = new Set();
                 for (const line of value.split("\n")) {
+                  const trimmedLine = line.trim();
+                  if (
+                    !trimmedLine ||
+                    trimmedLine ===
+                      "| Finding ID | Finding | Severity | Investigation | First Seen | Result |" ||
+                    /^\|-{12}\|-{9}\|-{10}\|-{15}\|-{12}\|-{8}\|$/.test(
+                      trimmedLine
+                    ) ||
+                    !trimmedLine.startsWith("|")
+                  ) {
+                    continue;
+                  }
                   const match = line.match(
                     /^\| `([^`]+)` \| ([^|]*) \| ([^|]*) \| (⏳ Pending|🔄 Dispatched|✅ Done) \| ([^|]*) \| (.*) \|$/
                   );
                   if (!match) {
-                    continue;
+                    throw new Error(
+                      `Malformed Investigation Results row: ${trimmedLine}`
+                    );
                   }
                   if (rows.has(match[1])) {
                     throw new Error(`Duplicate Investigation Results row for ${match[1]}`);

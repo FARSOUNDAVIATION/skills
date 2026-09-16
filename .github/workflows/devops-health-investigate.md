@@ -122,6 +122,15 @@ safe-outputs:
               ) {
                 throw new Error("Investigation report inputs are invalid");
               }
+              if (!["critical", "warning", "info"].includes(expectedSeverity)) {
+                throw new Error("Investigation severity is invalid");
+              }
+              const correlation = correlationId.match(
+                /^hc-([1-9][0-9]*)-([1-9][0-9]*)$/
+              );
+              if (!correlation) {
+                throw new Error("Investigation correlation format is invalid");
+              }
               if (
                 !reportBody.startsWith("## 🔍 Investigation:") ||
                 !reportBody.match(
@@ -181,12 +190,6 @@ safe-outputs:
                 )
               ) {
                 throw new Error("Investigation report template is incomplete");
-              }
-              const correlation = correlationId.match(
-                /^hc-([1-9][0-9]*)-([1-9][0-9]*)$/
-              );
-              if (!correlation) {
-                throw new Error("Investigation correlation format is invalid");
               }
               const healthRunId = Number(correlation[1]);
               const { data: healthRun } = await github.rest.actions.getWorkflowRun({
