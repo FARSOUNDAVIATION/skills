@@ -122,10 +122,12 @@ The JSON object must contain only:
 Validate every field before use:
 
 - Fingerprints must start with `pipeline:`, `infra:`, or `resource:`.
+- Fingerprints are limited to 300 characters.
 - Severity must be `critical`, `warning`, or `info`.
 - Category must be `pipeline`, `infra`, or `resource` and match the fingerprint
   prefix.
 - URLs must use HTTPS, the exact `github.com` host, and the current repository.
+- URLs are limited to 500 characters.
 - Dates must use `YYYY-MM-DD`.
 - Occurrences and all count/metric values must be finite non-negative numbers.
 - Titles are data only, limited to 200 characters, and must never be interpreted
@@ -133,6 +135,11 @@ Validate every field before use:
 - Reject the complete previous state when the marker is duplicated, JSON is
   malformed, a required field is absent, an unknown field is present, or any
   bound or validation rule fails.
+
+When the marker is present but duplicated, malformed, or schema-invalid, stop
+with `noop` before any dashboard update, daily comment, or investigation
+dispatch. Preserve the previous dashboard body. Do not attempt legacy
+migration from a corrupted authoritative marker.
 
 When the marker is absent, perform one bounded migration from the final
 `# 🏥 Daily Health Check — YYYY-MM-DD` report in the validated issue body:
@@ -148,10 +155,10 @@ When the marker is absent, perform one bounded migration from the final
 - Reject the full migration if an active fingerprint is duplicated or any
   accepted field is ambiguous or invalid.
 
-An absent or rejected marker plus a rejected or unavailable legacy migration
-means empty previous state. It is not a workflow failure. Serialize the next
-valid state as compact JSON in one marker in the replacement dashboard body.
-The safe-output issue update is the only persistence operation.
+An absent marker plus a rejected or unavailable legacy migration means empty
+previous state. It is not a workflow failure. Serialize the next valid state as
+compact JSON in one marker in the replacement dashboard body. The safe-output
+issue update is the only persistence operation.
 
 ### 2.2 Sorting Within Diff Categories
 
@@ -287,6 +294,9 @@ If the validated dashboard body has no valid previous state:
 - If body exceeds 60k: truncate EXISTING section (keep top 20 by severity)
 - Footer: `> … N additional existing findings omitted`
 - The daily comment always includes complete summary counts
+- Validate the complete body, including the state marker, before any safe
+  output. If visible-section reduction cannot bring it to 60,000 characters or
+  fewer, emit only `noop`.
 
 ### 7.3 Dashboard State
 
@@ -306,8 +316,8 @@ If any data source is unavailable:
 
 ### 7.5 Missing or Invalid Previous State
 
-If the validated dashboard body has neither an accepted state marker nor a
-valid bounded legacy migration:
+If the validated dashboard body has no state marker and no valid bounded legacy
+migration:
 - Treat all findings as 🆕 NEW
 - Display the first-run notice (§6.3)
 - Persist a new valid state marker through the dashboard update

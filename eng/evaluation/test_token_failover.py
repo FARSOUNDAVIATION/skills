@@ -299,6 +299,15 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn(
             "Never truncate the authoritative state", normalized_health
         )
+        self.assertIn("present but invalid marker is state corruption", normalized_health)
+        self.assertIn("Preserve the previous issue body", health_check)
+        self.assertIn("fingerprint to be at most 300 characters", normalized_health)
+        self.assertIn("URL at most 500 characters", normalized_health)
+        self.assertIn("complete body to be at most 60,000 characters", normalized_health)
+        self.assertIn(
+            "Do not emit `update-issue`, `add-comment`, or `dispatch-workflow`",
+            normalized_health,
+        )
         self.assertIn(
             "its `active_findings[].fingerprint` values are the authoritative current active set",
             normalized_groom,
@@ -419,7 +428,12 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("actions/runs/{numeric_run_id}", investigate)
         self.assertIn("Do not invoke a playbook", normalized_investigate)
         self.assertIn(
-            "Require the derived canonical `fingerprint`, `category`, `severity`, and title",
+            "Require the derived canonical `fingerprint`, `category`, and `severity`",
+            normalized_investigate,
+        )
+        self.assertIn("Treat `finding_title` as display-only", normalized_investigate)
+        self.assertIn(
+            "canonical report title from the same trusted metadata",
             normalized_investigate,
         )
         self.assertIn(
