@@ -570,6 +570,8 @@ safe-outputs:
                 ...context.repo,
                 issue_number: issueNumber,
               });
+              const observedUpdatedAt = issue.updated_at;
+              const observedBody = issue.body || "";
               const labels = issue.labels.map(label =>
                 typeof label === "string" ? label : label.name
               );
@@ -638,6 +640,29 @@ safe-outputs:
                     "Preserved outbox rows exceed the dashboard body limit"
                   );
                 }
+              }
+              if (
+                containsUnsafeMention(dashboardBody)
+              ) {
+                throw new Error("Final dashboard body contains an unsafe mention");
+              }
+              validateGitHubLinks(dashboardBody);
+              const { data: currentIssue } = await github.rest.issues.get({
+                ...context.repo,
+                issue_number: issueNumber,
+              });
+              const currentLabels = currentIssue.labels.map(label =>
+                typeof label === "string" ? label : label.name
+              );
+              if (
+                currentIssue.pull_request ||
+                currentIssue.state !== "open" ||
+                currentIssue.title !== "🏥 Repository Health Dashboard" ||
+                !currentLabels.includes("devops-health") ||
+                currentIssue.updated_at !== observedUpdatedAt ||
+                (currentIssue.body || "") !== observedBody
+              ) {
+                throw new Error("Dashboard changed before the transactional update");
               }
 
               await github.rest.issues.update({

@@ -358,6 +358,7 @@ def run_health_publisher(
     existing_comments: list[dict[str, object]] | None = None,
     initial_body: str = "",
     complete_template: bool = True,
+    mutate_on_second_issue_get: bool = False,
 ) -> dict[str, object]:
     node = shutil.which("node")
     if not node:
@@ -422,11 +423,13 @@ def run_health_publisher(
         existing_runs_json = json.dumps(run_records)
         existing_comments_json = json.dumps(existing_comments or [])
         fail_comment_json = json.dumps(fail_comment)
+        mutate_on_second_get_json = json.dumps(mutate_on_second_issue_get)
         harness_path.write_text(
             f"""
 const calls = [];
 let dispatchCount = 0;
 let updateCount = 0;
+let issueGetCount = 0;
 let currentBody = {json.dumps(initial_body)};
 const github = {{
   paginate: async (method, args) => {{
@@ -436,13 +439,20 @@ const github = {{
   rest: {{
     issues: {{
       get: async args => {{
+        issueGetCount += 1;
+        if ({mutate_on_second_get_json} && issueGetCount === 2) {{
+          currentBody += "\\nExternal edit";
+        }}
         calls.push({{ type: "get", args }});
         return {{
           data: {{
             state: "open",
             title: "🏥 Repository Health Dashboard",
             labels: [{{ name: "devops-health" }}],
-            updated_at: "2026-09-16T10:00:00Z",
+            updated_at:
+              {mutate_on_second_get_json} && issueGetCount === 2
+                ? "2026-09-16T10:01:00Z"
+                : "2026-09-16T10:00:00Z",
             body: currentBody
           }}
         }};
@@ -1329,7 +1339,7 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertTrue(valid["ok"])
         self.assertEqual(
             [call["type"] for call in valid["calls"]],
-            ["get-comment", "get", "update", "repo", "comment"],
+            ["get-comment", "get", "get", "update", "repo", "comment"],
         )
 
         fabricated = run_health_publisher(
@@ -1432,6 +1442,7 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertEqual(
             [call["type"] for call in result["calls"]],
             [
+                "get",
                 "get",
                 "update",
                 "repo",
@@ -1566,6 +1577,29 @@ class TokenFailoverTests(unittest.TestCase):
             if call["type"] == "update"
         )
         self.assertIn("<!-- correlation:hc-101-1 -->", persisted_body)
+
+        unsafe_prior = body.replace(
+            "⏳ Awaiting investigation result",
+            "[unsafe](//attacker.example/path)",
+        )
+        rejected_restore = run_health_publisher(
+            self,
+            {
+                "dashboard_body": resolved_body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": "[]",
+            },
+            initial_body=unsafe_prior,
+        )
+        self.assertFalse(rejected_restore["ok"])
+        self.assertIn(
+            "Protocol-relative links are not allowed",
+            rejected_restore["error"],
+        )
+        self.assertEqual(
+            [call["type"] for call in rejected_restore["calls"]],
+            ["get"],
+        )
 
     def test_devops_health_publisher_reconciles_before_budget(self) -> None:
         findings = [
@@ -1947,7 +1981,29 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(
             [call["type"] for call in result["calls"]],
-            ["get", "update", "repo", "comment"],
+            ["get", "get", "update", "repo", "comment"],
+        )
+
+        concurrent = run_health_publisher(
+            self,
+            {
+                "dashboard_body": body,
+                "daily_comment": (
+                    "## 📋 Health Check — 2026-09-16\n\n"
+                    "Found `owner/action@v1`."
+                ),
+                "dispatches_json": "[]",
+            },
+            mutate_on_second_issue_get=True,
+        )
+        self.assertFalse(concurrent["ok"])
+        self.assertIn(
+            "Dashboard changed before the transactional update",
+            concurrent["error"],
+        )
+        self.assertNotIn(
+            "update",
+            [call["type"] for call in concurrent["calls"]],
         )
 
         unsafe = run_health_publisher(
