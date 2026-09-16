@@ -390,15 +390,6 @@ safe-outputs:
                   throw new Error("Dashboard history schema is invalid");
                 }
               }
-              const activeFinding = stateFindings.get(findingId);
-              if (
-                activeFinding &&
-                activeFinding.severity !== expectedSeverity
-              ) {
-                throw new Error(
-                  "Active finding severity does not match workflow input"
-                );
-              }
               const escapedFindingId = findingId.replace(
                 /[.*+?^${}()|[\]\\]/g,
                 "\\$&"
@@ -408,14 +399,45 @@ safe-outputs:
                 "\\$&"
               );
               const pendingRowPattern = new RegExp(
-                `^\\| \`${escapedFindingId}\` \\| [^|]* \\| [^|]* ` +
+                `^\\| \`${escapedFindingId}\` \\| ([^|]*) \\| ([^|]*) ` +
                   `\\| ⏳ Pending \\| [^|]* \\| [^\\r\\n]*` +
                   `<!-- correlation:${escapedCorrelationId} --> [^\\r\\n]*\\|$`,
                 "m"
               );
-              if (!pendingRowPattern.test(issue.body || "")) {
+              const pendingRow = (issue.body || "").match(pendingRowPattern);
+              if (!pendingRow) {
                 throw new Error(
                   "Finding and correlation are not an active pending dashboard row"
+                );
+              }
+              const rowTitle = pendingRow[1].trim();
+              const severityByLabel = {
+                "🔴 Critical": "critical",
+                "🟡 Warning": "warning",
+                "🔵 Info": "info",
+              };
+              const rowSeverity = severityByLabel[pendingRow[2].trim()];
+              const activeFinding = stateFindings.get(findingId);
+              if (
+                !rowSeverity ||
+                expectedSeverity !== rowSeverity ||
+                !reportBody.startsWith(`## 🔍 Investigation: ${rowTitle}\n`) ||
+                !reportBody.match(
+                  new RegExp(
+                    `^\\*\\*Severity:\\*\\* ${rowSeverity}\\s*$`,
+                    "m"
+                  )
+                ) ||
+                (
+                  activeFinding &&
+                  (
+                    activeFinding.title !== rowTitle ||
+                    activeFinding.severity !== rowSeverity
+                  )
+                )
+              ) {
+                throw new Error(
+                  "Investigation report title or severity does not match the pending row"
                 );
               }
               await github.rest.issues.createComment({

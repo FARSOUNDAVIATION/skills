@@ -2148,6 +2148,35 @@ class TokenFailoverTests(unittest.TestCase):
             ["get-run", "get-issue"],
         )
 
+        misleading = run_investigation_publisher(
+            self,
+            report_body=(
+                "## 🔍 Investigation: Misleading title\n\n"
+                "**Finding ID:** `pipeline:evaluation:evaluate:test:failure`\n"
+                "**Severity:** critical\n"
+                "**Correlation:** hc-123-1\n"
+                "**Executive Summary:** Tests failed.\n\n"
+                "### Root Cause\nA deterministic failure was confirmed.\n\n"
+                "**Confidence:** High — the assertion identifies the cause.\n\n"
+                "### Blast Radius\nThe evaluation workflow is affected.\n\n"
+                "### Suggested Fix\n1. Correct the test setup.\n\n"
+                "### Remediation Status\nReport-only. A maintainer should fix it.\n\n"
+                "**Validation:** Run the targeted test.\n"
+                "**Owner:** Evaluation maintainers\n\n"
+                "### Evidence\nThe workflow output confirms the failure.\n\n"
+                "### Related\nNone found."
+            ),
+        )
+        self.assertFalse(misleading["ok"])
+        self.assertIn(
+            "title or severity does not match the pending row",
+            misleading["error"],
+        )
+        self.assertEqual(
+            [call["type"] for call in misleading["calls"]],
+            ["get-run", "get-issue"],
+        )
+
     def test_devops_health_investigator_has_no_mutating_tools(self) -> None:
         workflows = REPO_ROOT / ".github" / "workflows"
         investigate_source = workflows / "devops-health-investigate.md"
