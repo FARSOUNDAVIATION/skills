@@ -642,7 +642,7 @@ safe-outputs:
                   )
                   .sort()[0];
                 existingRuns = await github.paginate(
-                  github.rest.actions.listWorkflowRuns,
+                  github.rest.actions.listWorkflowRunsForWorkflow,
                   {
                     ...context.repo,
                     workflow_id: "devops-health-investigate.lock.yml",
@@ -729,6 +729,7 @@ safe-outputs:
                       ...dispatch,
                       correlation_id: correlationId,
                       health_issue_number: String(issueNumber),
+                      dry_run: "false",
                     },
                   });
                   dispatchedCount += 1;

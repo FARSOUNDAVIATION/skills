@@ -360,7 +360,7 @@ const github = {{
       }}
     }},
     actions: {{
-      listWorkflowRuns: async args => {{
+      listWorkflowRunsForWorkflow: async args => {{
         calls.push({{ type: "list-runs", args }});
         return {{ data: {{ workflow_runs: {existing_runs_json} }} }};
       }},
@@ -593,6 +593,15 @@ class TokenFailoverTests(unittest.TestCase):
             'workflow_id: "devops-health-investigate.lock.yml"',
             publisher_script,
         )
+        self.assertIn(
+            "github.rest.actions.listWorkflowRunsForWorkflow",
+            publisher_script,
+        )
+        self.assertNotIn(
+            "github.rest.actions.listWorkflowRuns,",
+            publisher_script,
+        )
+        self.assertIn('dry_run: "false"', publisher_script)
         update_index = publisher_script.index("await github.rest.issues.update")
         dispatch_index = publisher_script.index(
             "await github.rest.actions.createWorkflowDispatch"
