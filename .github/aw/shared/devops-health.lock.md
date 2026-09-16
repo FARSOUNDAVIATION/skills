@@ -297,6 +297,13 @@ When an investigation becomes `done`, preserve its valid correlation and
 accept the result only when the referenced issue-695 comment is authored by
 `github-actions[bot]` and contains exactly matching finding, correlation, and
 executive-summary fields.
+Keep every `dispatching` or `dispatched` row until it becomes `done`, even when
+the finding leaves `active_findings`. The privileged publishers preserve the
+canonical prior row metadata for that bounded transition. A `done` row is
+immutable while its finding remains active and may be removed after the finding
+is resolved. Automatically expire a still-in-flight resolved row when its
+trusted correlation date is more than 14 days old so abandoned investigations
+cannot grow the dashboard without bound.
 **Priority order when cap is hit:**
 1. 🔴 Critical findings first
 2. Older pending findings before new findings at the same severity

@@ -52,6 +52,8 @@ def safe_output_script(workflow_name: str, job_name: str, step_name: str) -> str
 def run_investigation_publisher(
     test_case: unittest.TestCase,
     body: str,
+    *,
+    severity: str = "critical",
 ) -> dict[str, object]:
     node = shutil.which("node")
     if not node:
@@ -145,7 +147,7 @@ const github = {{
                 "GH_AW_AGENT_OUTPUT": str(output_path),
                 "EXPECTED_REPOSITORY": "dotnet/skills",
                 "FINDING_ID": finding_id,
-                "FINDING_SEVERITY": "critical",
+                "FINDING_SEVERITY": severity,
                 "HEALTH_ISSUE_NUMBER": "695",
                 "CORRELATION_ID": correlation,
             }
@@ -163,13 +165,19 @@ const github = {{
 
 def run_groom_publisher_without_rows(
     test_case: unittest.TestCase,
+    *,
+    include_active_finding: bool = True,
+    correlation_date: str = "2026-09-16",
+    row_status: str = "🔄 Dispatched",
+    result_text: str = "[pending](https://github.com/dotnet/skills/actions/runs/123)",
+    change_body_on_recheck: bool = False,
 ) -> dict[str, object]:
     node = shutil.which("node")
     if not node:
         test_case.skipTest("Node.js is required for publisher behavior tests")
 
     finding_id = "pipeline:evaluation:evaluate:test:failure"
-    correlation = "hc-2026-09-16-123-1"
+    correlation = f"hc-{correlation_date}-123-1"
     finding = {
         "fingerprint": finding_id,
         "title": "Evaluation failed",
@@ -188,12 +196,13 @@ def run_groom_publisher_without_rows(
         f"#investigation-fingerprint:{encoded_finding}) "
         "[](https://github.com/dotnet/skills/issues/695"
         f"#investigation-correlation:{correlation}) Evaluation failed | "
-        "🔴 critical | 🔄 Dispatched | 2026-09-16 | "
-        "[pending](https://github.com/dotnet/skills/actions/runs/123) |\n\n"
+        f"🔴 critical | {row_status} | 2026-09-16 | "
+        f"{result_text} |\n\n"
         "<!-- devops-health-state:v1\n"
-        f"{json.dumps({'active_findings': [finding], 'history': []}, separators=(',', ':'))}\n"
+        f"{json.dumps({'active_findings': [finding] if include_active_finding else [], 'history': []}, separators=(',', ':'))}\n"
         "-->"
     )
+    recheck_body = body + ("\nchanged" if change_body_on_recheck else "")
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
         output_path = root / "agent-output.json"
@@ -215,6 +224,7 @@ def run_groom_publisher_without_rows(
             f"""
 const errors = [];
 const calls = [];
+let getCalls = 0;
 const core = {{
   setFailed: message => errors.push(String(message)),
   info: () => {{}}
@@ -227,7 +237,9 @@ const github = {{
           state: "open",
           title: "🏥 Repository Health Dashboard",
           labels: [{{ name: "devops-health" }}],
-          body: {json.dumps(body)}
+          body: getCalls++ === 0
+            ? {json.dumps(body)}
+            : {json.dumps(recheck_body)}
         }}
       }}),
       update: async args => {{
@@ -789,7 +801,7 @@ class TokenFailoverTests(unittest.TestCase):
             groom_lock_text,
         )
         self.assertIn(
-            "A groomed row is not active in dashboard state",
+            "An inactive groomed row does not match a persisted investigation",
             groom_lock_text,
         )
         self.assertIn("Dashboard state marker is duplicated", groom_lock_text)
@@ -1300,12 +1312,94 @@ None found.
         )
         self.assertEqual(unsafe_reference["calls"], [])
 
+        wrong_title = run_investigation_publisher(
+            self,
+            valid_body.replace(
+                "## 🔍 Investigation: Evaluation failed",
+                "## 🔍 Investigation: Different finding",
+            ),
+        )
+        self.assertEqual(
+            wrong_title["errors"],
+            ["Investigation title or severity does not match the dashboard"],
+        )
+        self.assertEqual(wrong_title["calls"], [])
+
+        wrong_severity = run_investigation_publisher(
+            self,
+            valid_body.replace("**Severity:** critical", "**Severity:** warning"),
+            severity="warning",
+        )
+        self.assertEqual(
+            wrong_severity["errors"],
+            ["Investigation title or severity does not match the dashboard"],
+        )
+        self.assertEqual(wrong_severity["calls"], [])
+
     def test_groom_publisher_preserves_active_dispatched_rows(self) -> None:
         result = run_groom_publisher_without_rows(self)
 
         self.assertEqual(
             result["errors"],
             ["An active persisted investigation row was omitted or changed"],
+        )
+        self.assertEqual(result["calls"], [])
+
+    def test_groom_publisher_preserves_resolved_dispatched_rows(self) -> None:
+        result = run_groom_publisher_without_rows(
+            self,
+            include_active_finding=False,
+        )
+
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(
+            [call["type"] for call in result["calls"]],
+            ["update"],
+        )
+        self.assertIn("🔄 Dispatched", result["calls"][0]["body"])
+
+    def test_groom_publisher_expires_old_resolved_dispatched_rows(self) -> None:
+        result = run_groom_publisher_without_rows(
+            self,
+            include_active_finding=False,
+            correlation_date="2000-01-01",
+        )
+
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(
+            [call["type"] for call in result["calls"]],
+            ["update"],
+        )
+        self.assertNotIn("hc-2000-01-01-123-1", result["calls"][0]["body"])
+
+    def test_groom_status_parser_ignores_result_text(self) -> None:
+        result = run_groom_publisher_without_rows(
+            self,
+            include_active_finding=False,
+            row_status="✅ Done",
+            result_text=(
+                "[Summary contains ⏳ Dispatch pending]"
+                "(https://github.com/dotnet/skills/issues/695#issuecomment-999)"
+            ),
+        )
+
+        self.assertEqual(result["errors"], [])
+        self.assertEqual(
+            [call["type"] for call in result["calls"]],
+            ["update"],
+        )
+        self.assertNotIn("hc-2026-09-16-123-1", result["calls"][0]["body"])
+
+    def test_groom_publisher_rejects_concurrent_body_change(self) -> None:
+        result = run_groom_publisher_without_rows(
+            self,
+            include_active_finding=False,
+            change_body_on_recheck=True,
+        )
+
+        self.assertEqual(
+            result["errors"],
+            ["Dashboard changed during groom publication validation"],
         )
         self.assertEqual(result["calls"], [])
 

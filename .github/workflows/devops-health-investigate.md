@@ -414,6 +414,33 @@ safe-outputs:
                 );
                 return;
               }
+              const metadataStart =
+                matchingRows[0].indexOf(correlationMarker) +
+                correlationMarker.length;
+              const metadataMatch = matchingRows[0]
+                .slice(metadataStart)
+                .match(
+                  /^ ((?:\\.|[^|])*) \| (🔴 critical|🟡 warning|🔵 info) \|/
+                );
+              if (!metadataMatch) {
+                core.setFailed(
+                  "Dashboard investigation row has invalid canonical metadata"
+                );
+                return;
+              }
+              const canonicalTitle = metadataMatch[1]
+                .replace(/&#64;/g, "@")
+                .replace(/\\(.)/g, "$1");
+              const canonicalSeverity = metadataMatch[2].split(" ")[1];
+              if (
+                lines[0] !== `## 🔍 Investigation: ${canonicalTitle}` ||
+                severity !== canonicalSeverity
+              ) {
+                core.setFailed(
+                  "Investigation title or severity does not match the dashboard"
+                );
+                return;
+              }
 
               const comments = await github.paginate(
                 github.rest.issues.listComments,

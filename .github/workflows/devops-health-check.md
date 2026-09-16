@@ -580,11 +580,16 @@ safe-outputs:
                 const correlationMatch = line.match(
                   /#investigation-correlation:(hc-\d{4}-\d{2}-\d{2}-\d+-\d+)\)/
                 );
-                const outboxStatus = line.includes("⏳ Dispatch pending")
+                const statusMatch = line.match(
+                  / \| (⏳ Dispatch pending|🔄 Dispatched|✅ Done) \| \d{4}-\d{2}-\d{2} \|/
+                );
+                const outboxStatus = statusMatch?.[1] === "⏳ Dispatch pending"
                   ? "dispatching"
-                  : line.includes("🔄 Dispatched")
+                  : statusMatch?.[1] === "🔄 Dispatched"
                     ? "dispatched"
-                    : null;
+                    : statusMatch?.[1] === "✅ Done"
+                      ? "done"
+                      : null;
                 if (
                   outboxStatus &&
                   !legacyFingerprintMatch &&
@@ -604,6 +609,7 @@ safe-outputs:
                     }
                     priorOutbox.set(fingerprint, {
                       correlation: correlationMatch[1],
+                      line,
                       status: outboxStatus,
                     });
                   } catch {
@@ -612,6 +618,18 @@ safe-outputs:
                   }
                 }
               }
+              const resolvedOutboxExpired = prior => {
+                const date = prior.correlation.match(
+                  /^hc-(\d{4}-\d{2}-\d{2})-\d+-\d+$/
+                )?.[1];
+                if (!date) {
+                  return false;
+                }
+                const ageDays = Math.floor(
+                  (Date.now() - Date.parse(`${date}T00:00:00Z`)) / 86400000
+                );
+                return ageDays > 14;
+              };
 
               let state;
               let stateFindings;
@@ -656,6 +674,7 @@ safe-outputs:
               const seenRows = new Set();
               const rowByFingerprint = new Map();
               const validatedRows = [];
+              const retainedRows = [];
               for (const row of investigationRows) {
                 if (
                   !exactKeys(row, [
@@ -687,10 +706,7 @@ safe-outputs:
                   return;
                 }
                 const finding = stateFindings.get(row.fingerprint);
-                if (!finding) {
-                  core.setFailed("An investigation row is not active in persisted state");
-                  return;
-                }
+                const prior = priorOutbox.get(row.fingerprint);
                 const validCorrelation =
                   /^hc-\d{4}-\d{2}-\d{2}-\d+-\d+$/.test(row.correlation_id);
                 if (
@@ -733,16 +749,90 @@ safe-outputs:
                 }
                 seenRows.add(row.fingerprint);
                 rowByFingerprint.set(row.fingerprint, row);
+                if (!finding) {
+                  const allowedStatuses = prior?.status === "dispatching"
+                    ? new Set(["dispatching", "done"])
+                    : prior?.status === "dispatched"
+                      ? new Set(["dispatched", "done"])
+                      : prior?.status === "done"
+                        ? new Set(["done"])
+                        : new Set();
+                  if (
+                    !prior ||
+                    row.correlation_id !== prior.correlation ||
+                    !allowedStatuses.has(row.status)
+                  ) {
+                    core.setFailed(
+                      "An inactive investigation row does not match a persisted outbox row"
+                    );
+                    return;
+                  }
+                  if (prior.status === "done") {
+                    retainedRows.push(prior.line);
+                  } else if (resolvedOutboxExpired(prior)) {
+                    continue;
+                  } else if (row.status === "done") {
+                    const priorLine = prior.line.match(
+                      /^(.*) \| (⏳ Dispatch pending|🔄 Dispatched) \| (\d{4}-\d{2}-\d{2}) \| .* \|$/
+                    );
+                    if (!priorLine) {
+                      core.setFailed(
+                        "A persisted outbox row cannot be finalized safely"
+                      );
+                      return;
+                    }
+                    retainedRows.push(
+                      `${priorLine[1]} | ✅ Done | ${priorLine[3]} | ` +
+                      `[${escapeCell(row.result_summary)}](${row.result_url}) |`
+                    );
+                  } else {
+                    retainedRows.push(prior.line);
+                  }
+                  continue;
+                }
+                if (prior?.status === "done") {
+                  if (
+                    row.status !== "done" ||
+                    row.correlation_id !== prior.correlation
+                  ) {
+                    core.setFailed(
+                      "A completed investigation row was modified"
+                    );
+                    return;
+                  }
+                  retainedRows.push(prior.line);
+                  continue;
+                }
                 validatedRows.push({ finding, row });
               }
               for (const [fingerprint, prior] of priorOutbox) {
-                if (!stateFindings.has(fingerprint)) {
+                if (
+                  prior.status === "done" &&
+                  !stateFindings.has(fingerprint)
+                ) {
                   continue;
                 }
                 const row = rowByFingerprint.get(fingerprint);
                 const allowedStatuses = prior.status === "dispatching"
                   ? new Set(["dispatching", "done"])
-                  : new Set(["dispatched", "done"]);
+                  : prior.status === "dispatched"
+                    ? new Set(["dispatched", "done"])
+                    : new Set(["done"]);
+                if (
+                  !row &&
+                  ["dispatching", "dispatched"].includes(prior.status)
+                ) {
+                  if (
+                    !stateFindings.has(fingerprint) &&
+                    resolvedOutboxExpired(prior)
+                  ) {
+                    continue;
+                  }
+                  if (!stateFindings.has(fingerprint)) {
+                    retainedRows.push(prior.line);
+                    continue;
+                  }
+                }
                 if (
                   !row ||
                   row.correlation_id !== prior.correlation ||
@@ -846,7 +936,8 @@ safe-outputs:
               }
 
               const renderRows = finalizeDispatches =>
-                validatedRows.map(({ finding, row }) => {
+                [
+                  ...validatedRows.map(({ finding, row }) => {
                   const effectiveStatus =
                     finalizeDispatches &&
                     row.status === "dispatching" &&
@@ -887,8 +978,10 @@ safe-outputs:
                     `${correlationMarker} ${escapeCell(finding.title)} | ` +
                     `${severityEmoji} ${finding.severity} | ${statusText} | ` +
                     `${finding.first_seen} | ${resultText} |`
-                  );
-                }).join("\n");
+                    );
+                  }),
+                  ...retainedRows,
+                ].join("\n");
 
               const serializedState = JSON.stringify(state);
               if (
@@ -935,6 +1028,19 @@ safe-outputs:
 
               // Persistence is the prerequisite. Any failure throws and stops
               // before the comment or workflow dispatch operations.
+              const latestDashboard = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: 695,
+              });
+              if (
+                (latestDashboard.data.body || "") !== currentBody
+              ) {
+                core.setFailed(
+                  "Dashboard changed during health publication validation"
+                );
+                return;
+              }
               await github.rest.issues.update({
                 owner,
                 repo,
@@ -970,6 +1076,17 @@ safe-outputs:
                 }
               }
 
+              const persistedOutbox = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: 695,
+              });
+              if ((persistedOutbox.data.body || "") !== outboxBody) {
+                core.setFailed(
+                  "Dashboard changed after outbox persistence"
+                );
+                return;
+              }
               await github.rest.issues.update({
                 owner,
                 repo,
@@ -1435,7 +1552,13 @@ larger, call `noop` with the measured size and stop. Do not emit
 Build `investigation_rows_json` from the prior table using the invisible
 same-repository fingerprint link markers, never regenerated titles, for normal
 identity. Accept an old HTML-comment marker only as a bounded migration and
-rewrite it as the link marker. Include at most one row per active fingerprint.
+rewrite it as the link marker. Include at most one row per active fingerprint,
+plus every prior `dispatching` or `dispatched` row whose finding has since
+resolved. Keep its correlation and status unchanged unless a matching trusted
+comment moves it to `done`. Never change a prior `done` row while its finding
+remains active; it is immutable. A resolved `done` row may be omitted. Omit a
+resolved `dispatching` or `dispatched` row when its trusted correlation date is
+more than 14 days old; the privileged publisher applies the same expiry.
 Each row has exactly `fingerprint`, `status`, `correlation_id`,
 `result_summary`, and `result_url`. Status is `pending`, `dispatching`,
 `dispatched`, `done`, or `skipped`. Keep both result fields empty unless status
@@ -1445,9 +1568,9 @@ comment URL, and preserve the exact correlation from that matching
 for `dispatching`, `dispatched`, and `done`. A selected dispatch must use
 `dispatching` with the same
 correlation as its dispatch input. Preserve and reuse that correlation when
-retrying an existing `dispatching` outbox row. The
-privileged job derives title, severity, and first-seen date from `state_json`
-and renders the row marker.
+retrying an existing `dispatching` outbox row. The privileged job derives
+active-row metadata from `state_json` and preserves canonical prior-row
+metadata for a resolved in-flight investigation.
 
 ### 4.3 Daily Comment
 

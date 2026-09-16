@@ -442,6 +442,74 @@ safe-outputs:
                   character =>
                     `%${character.charCodeAt(0).toString(16).toUpperCase()}`
                 );
+              const priorOutbox = new Map();
+              for (const line of body.split(/\r?\n/)) {
+                const fingerprintMatch = line.match(
+                  /#investigation-fingerprint:([^)]*)\)/
+                );
+                const legacyFingerprintMatch = line.match(
+                  new RegExp(
+                    "<!-- investigation-" + "fingerprint:[^>\\r\\n]+-->"
+                  )
+                );
+                const correlationMatch = line.match(
+                  /#investigation-correlation:(hc-\d{4}-\d{2}-\d{2}-\d+-\d+)\)/
+                );
+                const statusMatch = line.match(
+                  / \| (⏳ Dispatch pending|🔄 Dispatched|✅ Done) \| \d{4}-\d{2}-\d{2} \|/
+                );
+                const status = statusMatch?.[1] === "⏳ Dispatch pending"
+                  ? "dispatching"
+                  : statusMatch?.[1] === "🔄 Dispatched"
+                    ? "dispatched"
+                    : statusMatch?.[1] === "✅ Done"
+                      ? "done"
+                      : null;
+                if (
+                  status &&
+                  !legacyFingerprintMatch &&
+                  (!fingerprintMatch || !correlationMatch)
+                ) {
+                  core.setFailed(
+                    "Dashboard contains an active investigation row without valid identity markers"
+                  );
+                  return;
+                }
+                if (fingerprintMatch && correlationMatch && status) {
+                  let fingerprint;
+                  try {
+                    fingerprint = decodeURIComponent(fingerprintMatch[1]);
+                  } catch {
+                    core.setFailed(
+                      "Dashboard contains an invalid investigation fingerprint marker"
+                    );
+                    return;
+                  }
+                  if (priorOutbox.has(fingerprint)) {
+                    core.setFailed(
+                      "Dashboard contains duplicate active investigation rows"
+                    );
+                    return;
+                  }
+                  priorOutbox.set(fingerprint, {
+                    correlation: correlationMatch[1],
+                    line,
+                    status,
+                  });
+                }
+              }
+              const resolvedOutboxExpired = prior => {
+                const date = prior.correlation.match(
+                  /^hc-(\d{4}-\d{2}-\d{2})-\d+-\d+$/
+                )?.[1];
+                if (!date) {
+                  return false;
+                }
+                const ageDays = Math.floor(
+                  (Date.now() - Date.parse(`${date}T00:00:00Z`)) / 86400000
+                );
+                return ageDays > 14;
+              };
               const seen = new Set();
               const rowByFingerprint = new Map();
               const renderedRows = [];
@@ -472,10 +540,7 @@ safe-outputs:
                   return;
                 }
                 const finding = active.get(row.fingerprint);
-                if (!finding) {
-                  core.setFailed("A groomed row is not active in dashboard state");
-                  return;
-                }
+                const prior = priorOutbox.get(row.fingerprint);
                 if (
                   row.status === "done" &&
                   (
@@ -517,6 +582,63 @@ safe-outputs:
                   }
                 }
                 rowByFingerprint.set(row.fingerprint, row);
+                if (!finding) {
+                  const allowedStatuses = prior?.status === "dispatching"
+                    ? new Set(["dispatching", "done"])
+                    : prior?.status === "dispatched"
+                      ? new Set(["dispatched", "done"])
+                      : prior?.status === "done"
+                        ? new Set(["done"])
+                        : new Set();
+                  if (
+                    !prior ||
+                    row.correlation_id !== prior.correlation ||
+                    !allowedStatuses.has(row.status)
+                  ) {
+                    core.setFailed(
+                      "An inactive groomed row does not match a persisted investigation"
+                    );
+                    return;
+                  }
+                  if (prior.status === "done") {
+                    renderedRows.push(prior.line);
+                  } else if (resolvedOutboxExpired(prior)) {
+                    seen.add(row.fingerprint);
+                    continue;
+                  } else if (row.status === "done") {
+                    const priorLine = prior.line.match(
+                      /^(.*) \| (⏳ Dispatch pending|🔄 Dispatched) \| (\d{4}-\d{2}-\d{2}) \| .* \|$/
+                    );
+                    if (!priorLine) {
+                      core.setFailed(
+                        "A persisted investigation row cannot be finalized safely"
+                      );
+                      return;
+                    }
+                    renderedRows.push(
+                      `${priorLine[1]} | ✅ Done | ${priorLine[3]} | ` +
+                      `[${escapeCell(row.result_summary)}](${row.result_url}) |`
+                    );
+                  } else {
+                    renderedRows.push(prior.line);
+                  }
+                  seen.add(row.fingerprint);
+                  continue;
+                }
+                if (prior?.status === "done") {
+                  if (
+                    row.status !== "done" ||
+                    row.correlation_id !== prior.correlation
+                  ) {
+                    core.setFailed(
+                      "A completed groomed row was modified"
+                    );
+                    return;
+                  }
+                  renderedRows.push(prior.line);
+                  seen.add(row.fingerprint);
+                  continue;
+                }
                 const severityEmoji = {
                   critical: "🔴",
                   warning: "🟡",
@@ -554,61 +676,8 @@ safe-outputs:
                 );
                 seen.add(row.fingerprint);
               }
-
-              const priorOutbox = new Map();
-              for (const line of body.split(/\r?\n/)) {
-                const fingerprintMatch = line.match(
-                  /#investigation-fingerprint:([^)]*)\)/
-                );
-                const legacyFingerprintMatch = line.match(
-                  new RegExp(
-                    "<!-- investigation-" + "fingerprint:[^>\\r\\n]+-->"
-                  )
-                );
-                const correlationMatch = line.match(
-                  /#investigation-correlation:(hc-\d{4}-\d{2}-\d{2}-\d+-\d+)\)/
-                );
-                const status = line.includes("⏳ Dispatch pending")
-                  ? "dispatching"
-                  : line.includes("🔄 Dispatched")
-                    ? "dispatched"
-                    : line.includes("✅ Done")
-                      ? "done"
-                      : null;
-                if (
-                  status &&
-                  !legacyFingerprintMatch &&
-                  (!fingerprintMatch || !correlationMatch)
-                ) {
-                  core.setFailed(
-                    "Dashboard contains an active investigation row without valid identity markers"
-                  );
-                  return;
-                }
-                if (fingerprintMatch && correlationMatch && status) {
-                  let fingerprint;
-                  try {
-                    fingerprint = decodeURIComponent(fingerprintMatch[1]);
-                  } catch {
-                    core.setFailed(
-                      "Dashboard contains an invalid investigation fingerprint marker"
-                    );
-                    return;
-                  }
-                  if (priorOutbox.has(fingerprint)) {
-                    core.setFailed(
-                      "Dashboard contains duplicate active investigation rows"
-                    );
-                    return;
-                  }
-                  priorOutbox.set(fingerprint, {
-                    correlation: correlationMatch[1],
-                    status,
-                  });
-                }
-              }
               for (const [fingerprint, prior] of priorOutbox) {
-                if (!active.has(fingerprint)) {
+                if (prior.status === "done" && !active.has(fingerprint)) {
                   continue;
                 }
                 const row = rowByFingerprint.get(fingerprint);
@@ -617,6 +686,21 @@ safe-outputs:
                   : prior.status === "dispatched"
                     ? new Set(["dispatched", "done"])
                     : new Set(["done"]);
+                if (
+                  !row &&
+                  ["dispatching", "dispatched"].includes(prior.status)
+                ) {
+                  if (
+                    !active.has(fingerprint) &&
+                    resolvedOutboxExpired(prior)
+                  ) {
+                    continue;
+                  }
+                  if (!active.has(fingerprint)) {
+                    renderedRows.push(prior.line);
+                    continue;
+                  }
+                }
                 if (
                   !row ||
                   row.correlation_id !== prior.correlation ||
@@ -671,6 +755,19 @@ safe-outputs:
                 return;
               }
 
+              const latestIssue = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: 695,
+              });
+              if (
+                (latestIssue.data.body || "") !== body
+              ) {
+                core.setFailed(
+                  "Dashboard changed during groom publication validation"
+                );
+                return;
+              }
               await github.rest.issues.update({
                 owner,
                 repo,
@@ -875,7 +972,7 @@ already in the table.
 ### 3.3 Hold Structured Rows
 
 Do not publish yet. Keep the structured rows in memory while Step 4 removes
-rows for findings proven resolved.
+only completed rows for findings proven resolved.
 
 ---
 
@@ -907,8 +1004,8 @@ For each investigation comment found in Step 2:
    the investigation was posted.
 3. A missing marker has already stopped the workflow, so no fallback row
    matching or pruning is allowed.
-4. For findings proven resolved by valid state, remove their rows in the next
-   step.
+4. For findings proven resolved by valid state, preserve `dispatching` and
+   `dispatched` rows until a trusted result moves them to `done`.
 
 ### 4.3 Remove Resolved Investigations from the Table
 
@@ -917,6 +1014,12 @@ For findings whose investigation is complete AND the finding is now resolved:
 - The investigation comment is still accessible via the issue's comment history — no need to keep resolved rows in the table
 - This keeps the table focused on active/in-progress investigations only
 
+For a resolved finding whose row is still `dispatching` or `dispatched`, keep
+the prior row with its exact correlation and canonical metadata. If its trusted
+comment now exists, publish the same row as `done`; it can be removed on the
+next groom run. Remove a still-in-flight resolved row when its trusted
+correlation date is more than 14 days old.
+
 ### 4.4 Publish Structured Rows
 
 When Steps 3 or 4 changed the row set, call `publish-groomed-dashboard` exactly
@@ -924,8 +1027,9 @@ once with `rows_json` containing one exact `json` fenced code block. The JSON
 value is an array of at most 100 objects with exactly `fingerprint`, `status`,
 `correlation_id`, `result_summary`, and `result_url`.
 
-Derive fingerprint identity, title, severity, and first-seen date from validated
-active state. Status is `pending`, `dispatching`, `dispatched`, `done`, or
+Derive active-row metadata from validated active state. For a resolved
+`dispatching` or `dispatched` row, preserve the canonical prior row metadata and
+exact correlation. Status is `pending`, `dispatching`, `dispatched`, `done`, or
 `skipped`. Keep result fields empty unless status is `done`; for a done row use
 only the bounded summary and canonical issue-695 comment URL. Preserve a valid
 correlation for dispatching, dispatched, or done rows. A done row must copy the
@@ -971,7 +1075,11 @@ call `noop` after `publish-groomed-dashboard`.
 - **Preserve the issue body structure**: When updating the issue body, keep ALL sections intact. Only modify the Investigation Results table rows and any resolved-finding annotations. Do not rewrite sections you don't need to change.
 - **Idempotent**: Running this workflow twice should produce the same result. If investigation results are already linked, don't re-link them. If comments are already hidden, they won't appear in the API results (collapsed).
 - **Create missing sections**: If the issue body doesn't contain a `## 🔍 Investigation Results` section, include the validated rows and let the privileged publisher insert the canonical section. Do not silently skip linking when matching investigation comments exist.
-- **Prune resolved rows**: Rows for findings that are no longer in the active fingerprint set (i.e. resolved) must be **removed** from the Investigation Results table entirely. The table should only show active investigations (🔄 Dispatched, ⏳ Skipped, ✅ Done for still-active findings). Historical investigation results remain accessible via the issue's comment history.
+- **Prune resolved rows safely**: Remove a resolved row only after it is
+  `done`. Preserve resolved `dispatching` and `dispatched` rows with their exact
+  correlation and canonical prior metadata until a trusted result completes
+  the outbox transaction, or until the trusted correlation date is more than
+  14 days old.
 - **Column schema**: The Investigation Results table MUST use the header `| Finding | Severity | Investigation | First Seen | Result |`. If the existing table uses a different schema (e.g. `| Finding | Severity | Status | Result |`), migrate it to the new schema during this grooming run. Map the old `Status` column to `Investigation`, and populate `First Seen` from the `<summary>` line in the Existing/New Findings sections (format: `first seen YYYY-MM-DD`), or use the investigation comment's `created_at` date as fallback.
 - **No shell or intermediate files**: Do all work through GitHub and safe-output
   tools. Hold parsed data and the issue body in memory.
