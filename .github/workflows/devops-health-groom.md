@@ -189,22 +189,120 @@ safe-outputs:
               } catch (error) {
                 throw new Error(`Dashboard state JSON is invalid: ${error.message}`);
               }
-              if (!Array.isArray(state.active_findings)) {
-                throw new Error("Dashboard active findings are invalid");
+              const exactKeys = (value, expected) =>
+                value &&
+                typeof value === "object" &&
+                !Array.isArray(value) &&
+                Object.keys(value).length === expected.length &&
+                expected.every(key => Object.hasOwn(value, key));
+              const validDate = value =>
+                typeof value === "string" &&
+                /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+                !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) &&
+                new Date(`${value}T00:00:00Z`)
+                  .toISOString()
+                  .slice(0, 10) === value;
+              const validNumber = value =>
+                typeof value === "number" &&
+                Number.isFinite(value) &&
+                value >= 0;
+              const validMetricObject = value =>
+                value &&
+                typeof value === "object" &&
+                !Array.isArray(value) &&
+                Object.values(value).every(metric =>
+                  typeof metric === "number"
+                    ? validNumber(metric)
+                    : validMetricObject(metric)
+                );
+              const fingerprintPatterns = [
+                /^pipeline:[a-z0-9._-]+:[a-z0-9._-]+:timeout$/,
+                /^pipeline:evaluation:failure-rate:(?:critical|warning)$/,
+                /^pipeline:evaluation:schedule-cancellation:(?:critical|warning)$/,
+                /^pipeline:[a-z0-9._-]+:[a-z0-9._-]+:[a-z0-9._-]+:[a-z0-9._-]+$/,
+                /^resource:eval-duration:(?:critical|warning)$/,
+                /^resource:cost-increase$/,
+                /^infra:(?:no-codeowners|no-dependabot|relaxed-skill-validation|verdict-warn-only|pages-deployment-failed)$/,
+                /^infra:unpinned-action:[a-z0-9._/-]+$/,
+                /^infra:orphan-skill:[a-z0-9._-]+:[a-z0-9._-]+$/,
+                /^infra:orphan-plugin:[a-z0-9._-]+$/,
+              ];
+              const validFingerprint = value =>
+                typeof value === "string" &&
+                fingerprintPatterns.filter(pattern => pattern.test(value)).length === 1;
+              if (
+                !exactKeys(state, ["active_findings", "history"]) ||
+                !Array.isArray(state.active_findings) ||
+                state.active_findings.length > 100 ||
+                !Array.isArray(state.history) ||
+                state.history.length > 14
+              ) {
+                throw new Error("Dashboard state root schema is invalid");
               }
               const stateFindings = new Map();
               for (const finding of state.active_findings) {
                 if (
-                  !finding ||
-                  typeof finding.fingerprint !== "string" ||
+                  !exactKeys(finding, [
+                    "fingerprint",
+                    "title",
+                    "severity",
+                    "category",
+                    "url",
+                    "first_seen",
+                    "occurrences",
+                  ]) ||
+                  !validFingerprint(finding.fingerprint) ||
                   typeof finding.title !== "string" ||
+                  finding.title.length === 0 ||
+                  finding.title.length > 200 ||
+                  /[\r\n|]/.test(finding.title) ||
                   !["critical", "warning", "info"].includes(finding.severity) ||
-                  typeof finding.first_seen !== "string" ||
+                  !["pipeline", "infra", "resource"].includes(finding.category) ||
+                  !finding.fingerprint.startsWith(`${finding.category}:`) ||
+                  typeof finding.url !== "string" ||
+                  finding.url.length > 500 ||
+                  !validDate(finding.first_seen) ||
+                  !Number.isInteger(finding.occurrences) ||
+                  finding.occurrences < 0 ||
                   stateFindings.has(finding.fingerprint)
                 ) {
                   throw new Error("Dashboard active finding is invalid");
                 }
+                const findingUrl = new URL(finding.url);
+                const repositoryPath = `/${context.repo.owner}/${context.repo.repo}`;
+                if (
+                  findingUrl.protocol !== "https:" ||
+                  findingUrl.hostname !== "github.com" ||
+                  findingUrl.username ||
+                  findingUrl.password ||
+                  !(
+                    findingUrl.pathname === repositoryPath ||
+                    findingUrl.pathname.startsWith(`${repositoryPath}/`)
+                  )
+                ) {
+                  throw new Error("Dashboard active finding URL is invalid");
+                }
                 stateFindings.set(finding.fingerprint, finding);
+              }
+              for (const entry of state.history) {
+                if (
+                  !exactKeys(entry, [
+                    "date",
+                    "new_count",
+                    "existing_count",
+                    "resolved_count",
+                    "by_severity",
+                    "metrics",
+                  ]) ||
+                  !validDate(entry.date) ||
+                  !validNumber(entry.new_count) ||
+                  !validNumber(entry.existing_count) ||
+                  !validNumber(entry.resolved_count) ||
+                  !validMetricObject(entry.by_severity) ||
+                  !validMetricObject(entry.metrics)
+                ) {
+                  throw new Error("Dashboard history schema is invalid");
+                }
               }
               const newRows = parseRows(section);
               const severityLabels = {

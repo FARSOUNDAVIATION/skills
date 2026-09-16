@@ -213,6 +213,7 @@ def run_investigation_publisher(
     *,
     actor: str = "github-actions[bot]",
     report_body: str | None = None,
+    dashboard_body_override: str | None = None,
 ) -> dict[str, object]:
     node = shutil.which("node")
     if not node:
@@ -220,7 +221,7 @@ def run_investigation_publisher(
 
     finding_id = "pipeline:evaluation:evaluate:test:failure"
     correlation_id = "hc-123-1"
-    dashboard_body = f"""# 🏥 Daily Health Check — 2026-09-16
+    dashboard_body = dashboard_body_override or f"""# 🏥 Daily Health Check — 2026-09-16
 
 ## 🔍 Investigation Results
 
@@ -229,7 +230,7 @@ def run_investigation_publisher(
 | `{finding_id}` | Evaluation tests failed | 🔴 Critical | ⏳ Pending | 2026-09-16 | ⏳ Awaiting investigation result <!-- correlation:{correlation_id} --> |
 
 <!-- devops-health-state:v1
-{json.dumps({"active_findings": [{"fingerprint": finding_id, "category": "pipeline"}], "history": []}, separators=(",", ":"))}
+{json.dumps({"active_findings": [{"fingerprint": finding_id, "title": "Evaluation tests failed", "severity": "critical", "category": "pipeline", "url": "https://github.com/dotnet/skills/actions/runs/123", "first_seen": "2026-09-16", "occurrences": 1}], "history": []}, separators=(",", ":"))}
 -->
 """
     if report_body is None:
@@ -812,6 +813,9 @@ class TokenFailoverTests(unittest.TestCase):
             "Investigation Results row does not match active state",
             groom_script,
         )
+        self.assertIn("Dashboard state root schema is invalid", groom_script)
+        self.assertIn("Dashboard active finding URL is invalid", groom_script)
+        self.assertIn("Dashboard history schema is invalid", groom_script)
         groom_manifest = json.loads(
             groom_lock_text.splitlines()[1].removeprefix("# gh-aw-manifest: ")
         )
@@ -1022,7 +1026,7 @@ class TokenFailoverTests(unittest.TestCase):
 {section}
 
 <!-- devops-health-state:v1
-{json.dumps({"active_findings": [{"fingerprint": finding_id, "title": "Evaluation tests failed", "severity": "critical", "first_seen": "2026-09-16"}], "history": []}, separators=(",", ":"))}
+{json.dumps({"active_findings": [{"fingerprint": finding_id, "title": "Evaluation tests failed", "severity": "critical", "category": "pipeline", "url": "https://github.com/dotnet/skills/actions/runs/500", "first_seen": "2026-09-16", "occurrences": 1}], "history": []}, separators=(",", ":"))}
 -->
 """
         empty_section = """## 🔍 Investigation Results
@@ -1054,6 +1058,46 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertEqual(
             [call["type"] for call in accepted["calls"]],
             ["get", "update"],
+        )
+
+        invalid_state_body = prior_body.replace(
+            json.dumps(
+                {
+                    "active_findings": [
+                        {
+                            "fingerprint": finding_id,
+                            "title": "Evaluation tests failed",
+                            "severity": "critical",
+                            "category": "pipeline",
+                            "url": "https://github.com/dotnet/skills/actions/runs/500",
+                            "first_seen": "2026-09-16",
+                            "occurrences": 1,
+                        }
+                    ],
+                    "history": [],
+                },
+                separators=(",", ":"),
+            ),
+            json.dumps(
+                {
+                    "active_findings": [
+                        {"fingerprint": finding_id}
+                    ],
+                    "history": [],
+                },
+                separators=(",", ":"),
+            ),
+        )
+        invalid = run_groom_publisher(
+            self,
+            prior_body=invalid_state_body,
+            section=section,
+        )
+        self.assertFalse(invalid["ok"])
+        self.assertIn("Dashboard active finding is invalid", invalid["error"])
+        self.assertEqual(
+            [call["type"] for call in invalid["calls"]],
+            ["get"],
         )
 
     def test_devops_health_publisher_rejects_invalid_state(self) -> None:
@@ -1978,6 +2022,29 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertEqual(
             [call["type"] for call in unsafe["calls"]],
             ["get-run"],
+        )
+
+        invalid_state_body = """# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+| `pipeline:evaluation:evaluate:test:failure` | Evaluation tests failed | 🔴 Critical | ⏳ Pending | 2026-09-16 | ⏳ Awaiting investigation result <!-- correlation:hc-123-1 --> |
+
+<!-- devops-health-state:v1
+{"active_findings":[{"fingerprint":"pipeline:evaluation:evaluate:test:failure","category":"pipeline"}],"history":[]}
+-->
+"""
+        invalid_state = run_investigation_publisher(
+            self,
+            dashboard_body_override=invalid_state_body,
+        )
+        self.assertFalse(invalid_state["ok"])
+        self.assertIn("Dashboard active finding is invalid", invalid_state["error"])
+        self.assertEqual(
+            [call["type"] for call in invalid_state["calls"]],
+            ["get-run", "get-issue"],
         )
 
     def test_devops_health_investigator_has_no_mutating_tools(self) -> None:
