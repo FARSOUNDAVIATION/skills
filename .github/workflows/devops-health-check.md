@@ -1370,7 +1370,7 @@ Replace the entire issue body with the following structure:
 ## 🔍 Investigation Results
 
 > Deep investigations are dispatched for new critical/warning findings.
-> The grooming workflow links results ~3 hours after this run.
+> The [grooming workflow](https://github.com/${{ github.repository }}/actions/workflows/devops-health-groom.lock.yml) links results ~3 hours after this run.
 
 | Finding | Severity | Investigation | First Seen | Result |
 |---------|----------|---------------|------------|--------|
@@ -1568,7 +1568,7 @@ Before finishing, verify:
   tools. Process API responses and dashboard state in memory. Do not create
   scripts or intermediate files.
 - **CRITICAL — Safe output body must be inline**: When calling `publish-health-report`, the `body` field must contain the **complete, literal issue body text**. NEVER write the body to a file and use a shell reference like `$(cat file.txt)` — safe outputs are literal JSON strings, not shell-evaluated. Pass the body directly as the string value.
-- **CRITICAL — Investigation Results section**: The `## 🔍 Investigation Results` section MUST always appear in the issue body template. The downstream [grooming workflow](../workflows/devops-health-groom.md) manages this section via a `replace-island` block. Index rows by the invisible same-repository fingerprint link marker, preserve one row for each active finding, update Pending rows to Dispatched in place, and add Pending rows for qualifying findings deferred by the budget. Append a row only when that fingerprint has no row. Do NOT wrap the section in island markers yourself — the groom adds those.
+- **CRITICAL — Investigation Results section**: The `## 🔍 Investigation Results` section MUST always appear in the issue body template. The downstream [grooming workflow](https://github.com/${{ github.repository }}/actions/workflows/devops-health-groom.lock.yml) manages this section via a `replace-island` block. Index rows by the invisible same-repository fingerprint link marker, preserve one row for each active finding, update Pending rows to Dispatched in place, and add Pending rows for qualifying findings deferred by the budget. Append a row only when that fingerprint has no row. Do NOT wrap the section in island markers yourself — the groom adds those.
 - **Be data-driven**: Include specific numbers, durations, percentages, and links.
 - **Be precise with fingerprints**: Use the exact fingerprint formulas from the knowledge file. Consistency is critical — the same finding MUST produce the same fingerprint across runs.
 - **First run handling**: If the validated dashboard body has no valid previous

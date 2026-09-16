@@ -558,7 +558,7 @@ safe-outputs:
                 "## 🔍 Investigation Results",
                 "",
                 "> Deep investigations are dispatched for new critical/warning findings.",
-                "> The [grooming workflow](../workflows/devops-health-groom.md) links results ~3 hours after this run.",
+                `> The [grooming workflow](https://github.com/${owner}/${repo}/actions/workflows/devops-health-groom.lock.yml) links results ~3 hours after this run.`,
                 "",
                 "| Finding | Severity | Investigation | First Seen | Result |",
                 "|---------|----------|---------------|------------|--------|",

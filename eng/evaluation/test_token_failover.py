@@ -312,6 +312,22 @@ class TokenFailoverTests(unittest.TestCase):
             health_lock_text,
         )
         self.assertIn("Bare www links are not allowed", health_lock_text)
+        self.assertNotIn(
+            "(../workflows/devops-health-groom.md)",
+            health_check,
+        )
+        self.assertNotIn(
+            "(../workflows/devops-health-groom.md)",
+            groom,
+        )
+        self.assertIn(
+            "/actions/workflows/devops-health-groom.lock.yml",
+            health_check,
+        )
+        self.assertIn(
+            "/actions/workflows/devops-health-groom.lock.yml",
+            groom,
+        )
         self.assertIn(
             'item.body.includes("<!-- devops-health-state:v1")',
             health_lock_text,
