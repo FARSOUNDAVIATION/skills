@@ -127,6 +127,18 @@ def run_investigation_publisher(
 
     finding_id = "pipeline:evaluation:evaluate:test:failure"
     correlation_id = "hc-123-1"
+    dashboard_body = f"""# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+| `{finding_id}` | Evaluation tests failed | 🔴 Critical | ⏳ Pending | 2026-09-16 | ⏳ Awaiting investigation result <!-- correlation:{correlation_id} --> |
+
+<!-- devops-health-state:v1
+{json.dumps({"active_findings": [{"fingerprint": finding_id, "category": "pipeline"}], "history": []}, separators=(",", ":"))}
+-->
+"""
     report_body = (
         "## 🔍 Investigation: Evaluation tests failed\n\n"
         f"**Finding ID:** `{finding_id}`\n"
@@ -176,7 +188,8 @@ const github = {{
           data: {{
             state: "open",
             title: "🏥 Repository Health Dashboard",
-            labels: [{{ name: "devops-health" }}]
+            labels: [{{ name: "devops-health" }}],
+            body: {json.dumps(dashboard_body)}
           }}
         }};
       }},
@@ -638,10 +651,7 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertFalse(groom_frontmatter["tools"]["cli-proxy"])
         self.assertFalse(groom_frontmatter["tools"]["edit"])
         self.assertFalse(groom_frontmatter["tools"]["bash"])
-        self.assertEqual(
-            groom_frontmatter["safe-outputs"]["update-issue"]["target"],
-            "695",
-        )
+        self.assertNotIn("update-issue", groom_frontmatter["safe-outputs"])
         self.assertFalse(
             groom_frontmatter["safe-outputs"]["report-failure-as-issue"]
         )
@@ -652,9 +662,51 @@ class TokenFailoverTests(unittest.TestCase):
         groom_configs = generated_safe_output_configs(groom_lock)
         self.assertEqual(len(groom_configs), 2)
         for config in groom_configs:
-            self.assertEqual(config["update_issue"]["target"], "695")
+            self.assertNotIn("update_issue", config)
             self.assertNotIn("hide_comment", config)
             self.assertNotIn("create_report_incomplete_issue", config)
+        groom_publisher = groom_frontmatter["safe-outputs"]["jobs"][
+            "publish-groomed-dashboard"
+        ]
+        self.assertEqual(
+            groom_publisher["if"],
+            "needs.detection.outputs.detection_success == 'true'",
+        )
+        self.assertEqual(
+            groom_publisher["permissions"],
+            {"contents": "read", "issues": "write"},
+        )
+        groom_publisher_job = groom_lock["jobs"]["publish_groomed_dashboard"]
+        groom_script = next(
+            step["with"]["script"]
+            for step in groom_publisher_job["steps"]
+            if step.get("name") == "Verify and publish groomed dashboard"
+        )
+        self.assertIn(
+            "issue.updated_at !== expectedUpdatedAt",
+            groom_script,
+        )
+        self.assertIn(
+            "Dashboard identity or version validation failed",
+            groom_script,
+        )
+        groom_manifest = json.loads(
+            groom_lock_text.splitlines()[1].removeprefix("# gh-aw-manifest: ")
+        )
+        groom_safe_tools = next(
+            server["tools"]
+            for server in groom_manifest["mcp_servers"]
+            if server["name"] == "safeoutputs"
+        )
+        self.assertEqual(
+            groom_safe_tools,
+            [
+                "missing_data",
+                "missing_tool",
+                "noop",
+                "publish_groomed_dashboard",
+            ],
+        )
         self.assertNotIn("--allow-all-tools", groom_lock_text)
         self.assertNotIn("--allow-tool write", groom_lock_text)
         self.assertNotIn("shell(yq)", groom_lock_text)

@@ -190,6 +190,50 @@ safe-outputs:
               ) {
                 throw new Error("Dashboard issue identity validation failed");
               }
+              const markerMatches = [
+                ...(issue.body || "").matchAll(
+                  /<!-- devops-health-state:v1\s*\n([\s\S]*?)\n-->/g
+                ),
+              ];
+              if (markerMatches.length !== 1) {
+                throw new Error("Dashboard state marker validation failed");
+              }
+              let state;
+              try {
+                state = JSON.parse(markerMatches[0][1]);
+              } catch (error) {
+                throw new Error(`Dashboard state JSON is invalid: ${error.message}`);
+              }
+              if (
+                !Array.isArray(state.active_findings) ||
+                !state.active_findings.some(
+                  finding =>
+                    finding &&
+                    finding.fingerprint === findingId &&
+                    finding.category === findingId.split(":", 1)[0]
+                )
+              ) {
+                throw new Error("Finding is not active in the dashboard state");
+              }
+              const escapedFindingId = findingId.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&"
+              );
+              const escapedCorrelationId = correlationId.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                "\\$&"
+              );
+              const pendingRowPattern = new RegExp(
+                `^\\| \`${escapedFindingId}\` \\| [^|]* \\| [^|]* ` +
+                  `\\| ⏳ Pending \\| [^|]* \\| [^\\r\\n]*` +
+                  `<!-- correlation:${escapedCorrelationId} --> [^\\r\\n]*\\|$`,
+                "m"
+              );
+              if (!pendingRowPattern.test(issue.body || "")) {
+                throw new Error(
+                  "Finding and correlation are not an active pending dashboard row"
+                );
+              }
               await github.rest.issues.createComment({
                 ...context.repo,
                 issue_number: issueNumber,
