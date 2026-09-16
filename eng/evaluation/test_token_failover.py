@@ -101,6 +101,127 @@ def health_publisher_script() -> str:
     )
 
 
+def investigation_publisher_script() -> str:
+    source = (
+        REPO_ROOT / ".github" / "workflows" / "devops-health-investigate.md"
+    ).read_text(encoding="utf-8")
+    frontmatter = yaml.safe_load(source.split("---", 2)[1])
+    publisher = frontmatter["safe-outputs"]["jobs"][
+        "publish-investigation-report"
+    ]
+    return next(
+        step["with"]["script"]
+        for step in publisher["steps"]
+        if step.get("name") == "Verify and publish investigation report"
+    )
+
+
+def run_investigation_publisher(
+    test_case: unittest.TestCase,
+    *,
+    actor: str = "github-actions[bot]",
+) -> dict[str, object]:
+    node = shutil.which("node")
+    if not node:
+        test_case.skipTest("Node.js is required for publisher behavior tests")
+
+    finding_id = "pipeline:evaluation:evaluate:test:failure"
+    correlation_id = "hc-123-1"
+    report_body = (
+        "## 🔍 Investigation: Evaluation tests failed\n\n"
+        f"**Finding ID:** `{finding_id}`\n"
+        "**Severity:** critical\n"
+        f"**Correlation:** {correlation_id}\n"
+        "**Executive Summary:** Tests failed."
+    )
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        output_path = temp_path / "agent-output.json"
+        harness_path = temp_path / "investigation-publisher-harness.cjs"
+        output_path.write_text(
+            json.dumps(
+                {
+                    "items": [
+                        {
+                            "type": "publish_investigation_report",
+                            "report_body": report_body,
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        harness_path.write_text(
+            f"""
+const calls = [];
+const github = {{
+  rest: {{
+    actions: {{
+      getWorkflowRun: async args => {{
+        calls.push({{ type: "get-run", args }});
+        return {{
+          data: {{
+            path: ".github/workflows/devops-health-check.lock.yml",
+            event: "schedule",
+            status: "in_progress",
+            conclusion: null
+          }}
+        }};
+      }}
+    }},
+    issues: {{
+      get: async args => {{
+        calls.push({{ type: "get-issue", args }});
+        return {{
+          data: {{
+            state: "open",
+            title: "🏥 Repository Health Dashboard",
+            labels: [{{ name: "devops-health" }}]
+          }}
+        }};
+      }},
+      createComment: async args => {{
+        calls.push({{ type: "comment", body: args.body }});
+        return {{ data: {{}} }};
+      }}
+    }}
+  }}
+}};
+const context = {{
+  actor: {json.dumps(actor)},
+  repo: {{ owner: "dotnet", repo: "skills" }}
+}};
+(async () => {{
+{investigation_publisher_script()}
+}})()
+  .then(() => console.log(JSON.stringify({{ ok: true, calls }})))
+  .catch(error => console.log(JSON.stringify({{
+    ok: false,
+    error: error.message,
+    calls
+  }})));
+""",
+            encoding="utf-8",
+        )
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "GH_AW_AGENT_OUTPUT": str(output_path),
+                "EXPECTED_FINDING_ID": finding_id,
+                "EXPECTED_CORRELATION_ID": correlation_id,
+            }
+        )
+        completed = subprocess.run(
+            [node, str(harness_path)],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=environment,
+        )
+        return json.loads(completed.stdout.strip())
+
+
 def run_health_publisher(
     test_case: unittest.TestCase,
     item: dict[str, object],
@@ -111,6 +232,7 @@ def run_health_publisher(
     existing_correlations: list[str] | None = None,
     existing_runs: list[dict[str, object]] | None = None,
     existing_comments: list[dict[str, object]] | None = None,
+    initial_body: str = "",
 ) -> dict[str, object]:
     node = shutil.which("node")
     if not node:
@@ -144,7 +266,7 @@ def run_health_publisher(
 const calls = [];
 let dispatchCount = 0;
 let updateCount = 0;
-let currentBody = "";
+let currentBody = {json.dumps(initial_body)};
 const github = {{
   paginate: async (method, args) => {{
     const response = await method(args);
@@ -981,6 +1103,28 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Dispatch does not match pending state", result["error"])
         self.assertEqual(result["calls"], [])
 
+        prior_body = body.replace("hc-101-1", "hc-99-1")
+        matching_dispatch = {
+            **mismatch,
+            "finding_title": finding["title"],
+        }
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": json.dumps([matching_dispatch]),
+            },
+            initial_body=prior_body,
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("Active outbox correlation changed", result["error"])
+        self.assertEqual(
+            [call["type"] for call in result["calls"]],
+            ["get"],
+        )
+
     def test_devops_health_publisher_reconciles_before_budget(self) -> None:
         findings = [
             {
@@ -1362,7 +1506,9 @@ class TokenFailoverTests(unittest.TestCase):
         trigger = investigate_frontmatter.get("on", investigate_frontmatter.get(True))
         dispatch_inputs = trigger["workflow_dispatch"]["inputs"]
         self.assertEqual(dispatch_inputs["dry_run"]["type"], "boolean")
-        self.assertFalse(dispatch_inputs["dry_run"]["default"])
+        self.assertTrue(dispatch_inputs["dry_run"]["default"])
+        self.assertNotIn("skip-if-no-match", trigger)
+        self.assertNotIn("roles", trigger)
 
         self.assertEqual(
             investigate_frontmatter["safe-outputs"]["staged"],
@@ -1379,15 +1525,43 @@ class TokenFailoverTests(unittest.TestCase):
             "create-pull-request",
             investigate_frontmatter["safe-outputs"],
         )
+        self.assertNotIn("add-comment", investigate_frontmatter["safe-outputs"])
+        publisher = investigate_frontmatter["safe-outputs"]["jobs"][
+            "publish-investigation-report"
+        ]
         self.assertEqual(
-            investigate_frontmatter["safe-outputs"]["add-comment"]["target"],
-            "695",
+            publisher["if"],
+            "inputs.dry_run == false && "
+            "needs.detection.outputs.detection_success == 'true'",
+        )
+        self.assertEqual(
+            publisher["permissions"],
+            {"contents": "read", "actions": "read", "issues": "write"},
         )
         investigate_configs = generated_safe_output_configs(investigate_lock)
         self.assertEqual(len(investigate_configs), 2)
         for config in investigate_configs:
-            self.assertEqual(config["add_comment"]["target"], "695")
+            self.assertNotIn("add_comment", config)
             self.assertNotIn("create_report_incomplete_issue", config)
+        investigate_manifest = json.loads(
+            investigate_lock_text.splitlines()[1].removeprefix(
+                "# gh-aw-manifest: "
+            )
+        )
+        safe_output_tools = next(
+            server["tools"]
+            for server in investigate_manifest["mcp_servers"]
+            if server["name"] == "safeoutputs"
+        )
+        self.assertEqual(
+            safe_output_tools,
+            [
+                "missing_data",
+                "missing_tool",
+                "noop",
+                "publish_investigation_report",
+            ],
+        )
         self.assertIn(
             'GH_AW_FAILURE_REPORT_AS_ISSUE: "false"',
             investigate_lock_text,
@@ -1403,8 +1577,22 @@ class TokenFailoverTests(unittest.TestCase):
         )
         self.assertIn("This investigator is report-only", investigate)
         self.assertIn("The only allowed target is issue `695`", investigate)
-        self.assertIn("do not call `add-comment`", investigate)
-        self.assertIn("If `dry_run` is true, do not call `add-comment`", investigate)
+        self.assertIn("github-actions[bot]` dispatch provenance", investigate)
+        self.assertIn(
+            "If `dry_run` is true, do not call `publish-investigation-report`",
+            investigate,
+        )
+
+        valid = run_investigation_publisher(self)
+        self.assertTrue(valid["ok"])
+        self.assertEqual(
+            [call["type"] for call in valid["calls"]],
+            ["get-run", "get-issue", "comment"],
+        )
+        manual = run_investigation_publisher(self, actor="Evangelink")
+        self.assertFalse(manual["ok"])
+        self.assertIn("github-actions[bot] provenance", manual["error"])
+        self.assertEqual(manual["calls"], [])
 
     def test_devops_health_investigator_has_no_mutating_tools(self) -> None:
         workflows = REPO_ROOT / ".github" / "workflows"
@@ -1547,7 +1735,7 @@ class TokenFailoverTests(unittest.TestCase):
             self.assertIn(guard_requirement, normalized_investigate)
         self.assertNotIn("## agent:", investigate)
         self.assertNotIn("markdownlint-disable MD003", investigate)
-        self.assertIn("`noop` exactly once", investigate)
+        self.assertIn("`noop` exactly once", normalized_investigate)
         self.assertIn("### Remediation Status", investigate)
         self.assertIn("Report-only.", investigate)
         shared_health = (

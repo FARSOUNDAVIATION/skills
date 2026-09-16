@@ -37,9 +37,7 @@ on:
         description: "Investigate without posting a comment"
         required: false
         type: boolean
-        default: false
-  roles: all
-  skip-if-no-match: "is:issue is:open label:devops-health"
+        default: true
 
 concurrency:
   group: gh-aw-${{ github.workflow }}-${{ inputs.finding_id }}
@@ -64,9 +62,139 @@ safe-outputs:
   staged: ${{ inputs.dry_run }}
   report-failure-as-issue: false
   report-incomplete: false
-  add-comment:
-    target: "695"
-    max: 1
+  report-failed-jobs: false
+  jobs:
+    publish-investigation-report:
+      description: >
+        Verify health-check provenance and the canonical dashboard before
+        posting one investigation report.
+      if: inputs.dry_run == false && needs.detection.outputs.detection_success == 'true'
+      runs-on: ubuntu-slim
+      output: "Investigation report posted to the canonical health dashboard."
+      inputs:
+        report_body:
+          description: "Complete investigation report comment."
+          required: true
+          type: string
+      env:
+        EXPECTED_FINDING_ID: ${{ inputs.finding_id }}
+        EXPECTED_CORRELATION_ID: ${{ inputs.correlation_id }}
+      permissions:
+        contents: read
+        actions: read
+        issues: write
+      steps:
+        - name: Verify and publish investigation report
+          uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+          with:
+            script: |
+              const fs = require("fs");
+
+              if (context.actor !== "github-actions[bot]") {
+                throw new Error("Investigation publication requires github-actions[bot] provenance");
+              }
+              const outputPath = process.env.GH_AW_AGENT_OUTPUT;
+              if (!outputPath) {
+                throw new Error("GH_AW_AGENT_OUTPUT is not configured");
+              }
+              const output = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+              const items = (output.items || []).filter(
+                item => item.type === "publish_investigation_report"
+              );
+              if (items.length !== 1) {
+                throw new Error(
+                  `Expected exactly one publish_investigation_report item, found ${items.length}`
+                );
+              }
+
+              const reportBody = items[0].report_body;
+              const findingId = process.env.EXPECTED_FINDING_ID;
+              const correlationId = process.env.EXPECTED_CORRELATION_ID;
+              if (
+                typeof reportBody !== "string" ||
+                reportBody.length === 0 ||
+                reportBody.length > 65000 ||
+                typeof findingId !== "string" ||
+                typeof correlationId !== "string"
+              ) {
+                throw new Error("Investigation report inputs are invalid");
+              }
+              if (
+                !reportBody.startsWith("## 🔍 Investigation:") ||
+                !reportBody.match(
+                  new RegExp(
+                    `^\\*\\*Finding ID:\\*\\* \`${findingId.replace(
+                      /[.*+?^${}()|[\]\\]/g,
+                      "\\$&"
+                    )}\`\\s*$`,
+                    "m"
+                  )
+                ) ||
+                !reportBody.match(
+                  new RegExp(
+                    `^\\*\\*Correlation:\\*\\* ${correlationId}\\s*$`,
+                    "m"
+                  )
+                )
+              ) {
+                throw new Error("Investigation report identity does not match workflow inputs");
+              }
+              const correlation = correlationId.match(
+                /^hc-([1-9][0-9]*)-([1-9][0-9]*)$/
+              );
+              if (!correlation) {
+                throw new Error("Investigation correlation format is invalid");
+              }
+              const healthRunId = Number(correlation[1]);
+              const { data: healthRun } = await github.rest.actions.getWorkflowRun({
+                ...context.repo,
+                run_id: healthRunId,
+              });
+              if (
+                healthRun.path !==
+                  ".github/workflows/devops-health-check.lock.yml" ||
+                healthRun.event !== "schedule" &&
+                  healthRun.event !== "workflow_dispatch" ||
+                healthRun.status === "completed" &&
+                  healthRun.conclusion !== "success"
+              ) {
+                throw new Error("Correlation does not reference a valid health-check run");
+              }
+
+              for (const match of reportBody.matchAll(/https?:\/\/[^\s)<>"']+/g)) {
+                const link = new URL(match[0].replace(/[.,;:!?]+$/, ""));
+                if (link.protocol !== "https:" || link.hostname !== "github.com") {
+                  throw new Error(`Only github.com links are allowed: ${link.href}`);
+                }
+              }
+              const prose = reportBody
+                .replace(/```[\s\S]*?```/g, "")
+                .replace(/`[^`\n]*`/g, "");
+              if (/(^|[\s([{>,;:!?])@[A-Za-z0-9]/m.test(prose)) {
+                throw new Error("Investigation report contains an unsafe mention");
+              }
+
+              const issueNumber = 695;
+              const { data: issue } = await github.rest.issues.get({
+                ...context.repo,
+                issue_number: issueNumber,
+              });
+              const labels = issue.labels.map(label =>
+                typeof label === "string" ? label : label.name
+              );
+              if (
+                issue.pull_request ||
+                issue.state !== "open" ||
+                issue.title !== "🏥 Repository Health Dashboard" ||
+                !labels.includes("devops-health")
+              ) {
+                throw new Error("Dashboard issue identity validation failed");
+              }
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: issueNumber,
+                body: reportBody,
+              });
   noop:
     report-as-issue: false
 
@@ -252,17 +380,16 @@ stop.
 Re-fetch the configured issue directly from the current repository. Verify
 again that it is open and has both the title `🏥 Repository Health Dashboard`
 and the `devops-health` label. If any check fails, call `noop` with the report
-and stop; do not call `add-comment`.
+and stop; do not call `publish-investigation-report`.
 
-**IMPORTANT**: You MUST use the `add-comment` safe-output tool (NOT
-`update-issue`, which does not work for `workflow_dispatch` triggered
-workflows). The safe-output configuration binds the target to issue `695`; do
-not supply or derive another target from untrusted content.
+**IMPORTANT**: You MUST use the `publish-investigation-report` safe-output job.
+Its privileged step verifies `github-actions[bot]` dispatch provenance, the
+referenced health-check run, report identity fields, and canonical issue `695`
+before posting. Do not call `add-comment` or `update-issue` directly.
 
 ```
-add-comment:
-  item_number: 695
-  body: |
+publish-investigation-report:
+  report_body: |
     ## 🔍 Investigation: {canonical_title derived from trusted metadata}
 
     **Finding ID:** `{finding_id}`
@@ -297,9 +424,9 @@ add-comment:
     <sub>🔍 [Investigation Run #{this_run_number}]({this_run_url}) · Dispatched by health check · {correlation_id}</sub>
 ```
 
-If `dry_run` is true, do not call `add-comment`. Call `noop` exactly once with
-a compact summary of the root cause, evidence confidence, remediation proposal,
-validation plan, and owner.
+If `dry_run` is true, do not call `publish-investigation-report`. Call `noop`
+exactly once with a compact summary of the root cause, evidence confidence,
+remediation proposal, validation plan, and owner.
 
 ---
 

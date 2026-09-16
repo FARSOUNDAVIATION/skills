@@ -552,6 +552,34 @@ safe-outputs:
                   `Dashboard changed after validation (${expectedUpdatedAt} -> ${issue.updated_at})`
                 );
               }
+              const priorInvestigationSection = (issue.body || "").match(
+                /## 🔍 Investigation Results\s*\n([\s\S]*?)(?=\n## |\n<!-- devops-health-state:v1)/
+              );
+              if (priorInvestigationSection) {
+                for (const line of priorInvestigationSection[1].split("\n")) {
+                  const match = line.match(
+                    /^\| `([^`]+)` \| [^|]* \| [^|]* \| (⏳ Pending|🔄 Dispatched) \| [^|]* \| (.*) \|$/
+                  );
+                  if (!match || !stateFindings.has(match[1])) {
+                    continue;
+                  }
+                  const priorCorrelation = match[3].match(
+                    /<!-- correlation:(hc-[1-9][0-9]*-[1-9][0-9]*) -->/
+                  )?.[1];
+                  const nextRow = tableRows.get(match[1]);
+                  if (
+                    priorCorrelation &&
+                    (
+                      !nextRow ||
+                      nextRow.correlation_id !== priorCorrelation
+                    )
+                  ) {
+                    throw new Error(
+                      `Active outbox correlation changed for ${match[1]}`
+                    );
+                  }
+                }
+              }
 
               await github.rest.issues.update({
                 ...context.repo,
