@@ -21,7 +21,7 @@ on:
 if: ${{ (!(github.event_name == 'schedule' && github.event.repository.fork)) }}
 
 concurrency:
-  group: gh-aw-${{ github.workflow }}
+  group: gh-aw-devops-health-dashboard
   cancel-in-progress: false
   queue: max
 
@@ -299,6 +299,12 @@ After collecting all findings, perform the diff:
    or invalid, reject the complete migration and use empty previous state.
 
 2. **Compute current fingerprints** for all findings collected in Step 1.
+
+   **State overflow guard:** If more than 100 active findings are collected,
+   call `noop` with the measured count and stop. Do not update the dashboard,
+   add the daily comment, or dispatch investigations. Never truncate the
+   authoritative state, because an incomplete set would make active findings
+   appear resolved to the groomer.
 
 3. **Classify each finding:**
    - **🆕 NEW**: fingerprint is in current set but NOT in previous set

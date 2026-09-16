@@ -179,11 +179,10 @@ class TokenFailoverTests(unittest.TestCase):
         groom = groom_source.read_text(encoding="utf-8")
         normalized_groom = " ".join(groom.split())
         groom_frontmatter = yaml.safe_load(groom.split("---", 2)[1])
-        groom_lock = yaml.safe_load(
-            (workflows / "devops-health-groom.lock.yml").read_text(
-                encoding="utf-8"
-            )
-        )
+        groom_lock_text = (
+            workflows / "devops-health-groom.lock.yml"
+        ).read_text(encoding="utf-8")
+        groom_lock = yaml.safe_load(groom_lock_text)
 
         self.assertIn("Missing prior state is not missing data", health_check)
         self.assertIn("Do not call `missing-data`", health_check)
@@ -233,9 +232,6 @@ class TokenFailoverTests(unittest.TestCase):
         for config in groom_configs:
             self.assertEqual(config["update_issue"]["target"], "695")
             self.assertNotIn("hide_comment", config)
-        groom_lock_text = (
-            workflows / "devops-health-groom.lock.yml"
-        ).read_text(encoding="utf-8")
         self.assertNotIn("--allow-all-tools", groom_lock_text)
         self.assertNotIn("--allow-tool write", groom_lock_text)
         self.assertNotIn("shell(yq)", groom_lock_text)
@@ -266,13 +262,21 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertFalse(health_frontmatter["tools"]["edit"])
         self.assertEqual(
             health_frontmatter["concurrency"]["group"],
-            "gh-aw-${{ github.workflow }}",
+            "gh-aw-devops-health-dashboard",
         )
         self.assertFalse(
             health_frontmatter["concurrency"]["cancel-in-progress"]
         )
         self.assertEqual(health_frontmatter["concurrency"]["queue"], "max")
         self.assertEqual(health_lock["concurrency"]["queue"], "max")
+        self.assertEqual(
+            groom_frontmatter["concurrency"],
+            health_frontmatter["concurrency"],
+        )
+        self.assertEqual(
+            groom_lock["concurrency"],
+            health_lock["concurrency"],
+        )
         self.assertNotIn("cache-memory", health_frontmatter["tools"])
         self.assertNotIn("--allow-all-tools", health_lock_text)
         self.assertNotIn("--allow-tool write", health_lock_text)
@@ -290,6 +294,11 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("search_code: filename:plugin.json path:plugins", health_check)
         self.assertIn("search_code: filename:SKILL.md path:plugins", health_check)
         self.assertIn("If code search reaches its result limit", health_check)
+        self.assertIn("State overflow guard", health_check)
+        self.assertIn("more than 100 active findings", health_check)
+        self.assertIn(
+            "Never truncate the authoritative state", normalized_health
+        )
         self.assertIn(
             "its `active_findings[].fingerprint` values are the authoritative current active set",
             normalized_groom,
@@ -409,6 +418,14 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("the exact `github.com` host", normalized_investigate)
         self.assertIn("actions/runs/{numeric_run_id}", investigate)
         self.assertIn("Do not invoke a playbook", normalized_investigate)
+        self.assertIn(
+            "Require the derived canonical `fingerprint`, `category`, `severity`, and title",
+            normalized_investigate,
+        )
+        self.assertIn(
+            "Do not fetch logs or report content",
+            normalized_investigate,
+        )
 
     def test_devops_health_report_only_prompt_rejects_untrusted_actions(self) -> None:
         investigate = (

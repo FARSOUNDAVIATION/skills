@@ -96,6 +96,11 @@ next_state = {
 }
 ```
 
+If `current_fps` contains more than 100 active findings, stop with `noop` before
+classification outputs, dashboard updates, daily comments, or investigation
+dispatches. Report the measured count. Never truncate the authoritative active
+set: truncation would make omitted active findings appear resolved.
+
 ### 2.1 Dashboard State Schema
 
 Read state only from one exact marker in the validated issue `695` body:
