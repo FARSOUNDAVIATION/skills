@@ -20,6 +20,11 @@ on:
 # fork owner's minutes.
 if: ${{ (!(github.event_name == 'schedule' && github.event.repository.fork)) }}
 
+concurrency:
+  group: gh-aw-${{ github.workflow }}
+  cancel-in-progress: false
+  queue: max
+
 model: ${{ vars.GH_AW_MODEL_AGENT_COPILOT || vars.GH_AW_DEFAULT_MODEL_COPILOT || 'gpt-5.6-sol' }}
 
 permissions:

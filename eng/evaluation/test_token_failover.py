@@ -264,6 +264,15 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertFalse(health_frontmatter["tools"]["bash"])
         self.assertFalse(health_frontmatter["tools"]["cli-proxy"])
         self.assertFalse(health_frontmatter["tools"]["edit"])
+        self.assertEqual(
+            health_frontmatter["concurrency"]["group"],
+            "gh-aw-${{ github.workflow }}",
+        )
+        self.assertFalse(
+            health_frontmatter["concurrency"]["cancel-in-progress"]
+        )
+        self.assertEqual(health_frontmatter["concurrency"]["queue"], "max")
+        self.assertEqual(health_lock["concurrency"]["queue"], "max")
         self.assertNotIn("cache-memory", health_frontmatter["tools"])
         self.assertNotIn("--allow-all-tools", health_lock_text)
         self.assertNotIn("--allow-tool write", health_lock_text)
@@ -281,6 +290,20 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("search_code: filename:plugin.json path:plugins", health_check)
         self.assertIn("search_code: filename:SKILL.md path:plugins", health_check)
         self.assertIn("If code search reaches its result limit", health_check)
+        self.assertIn(
+            "its `active_findings[].fingerprint` values are the authoritative current active set",
+            normalized_groom,
+        )
+        self.assertIn("omitted from visible sections", groom)
+        self.assertIn("If the marker is absent or invalid", groom)
+        self.assertIn(
+            "this fallback is not authoritative for resolution",
+            normalized_groom,
+        )
+        self.assertIn(
+            "do not infer resolution from the visible fallback set",
+            normalized_groom,
+        )
         shared_health = (
             REPO_ROOT / ".github" / "aw" / "shared" / "devops-health.lock.md"
         ).read_text(encoding="utf-8")
