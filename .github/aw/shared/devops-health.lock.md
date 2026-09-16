@@ -268,7 +268,8 @@ When a finding's fingerprint matches any known-noise pattern (prefix match), dem
 
 ## 5. Investigation Dispatch Rules
 
-Only 🆕 NEW findings that meet these criteria qualify for investigation dispatch:
+New findings and pending retries that meet these criteria qualify for
+investigation dispatch:
 
 | Condition | Action |
 |-----------|--------|
@@ -276,13 +277,22 @@ Only 🆕 NEW findings that meet these criteria qualify for investigation dispat
 | 🆕 + 🟡 Warning + `pipeline` category | **Dispatch** |
 | 🆕 + 🟡 Warning + `infra` or `resource` category | **Skip** |
 | 🆕 + 🔵 Info | **Never dispatch** |
-| 📌 EXISTING or ✅ RESOLVED | **Never dispatch** |
+| 📌 EXISTING + qualifying + `⏳ Pending` or no investigation row | **Dispatch retry** |
+| 📌 EXISTING + `🔄 Dispatched` or `✅ Done` | **Never dispatch again** |
+| ✅ RESOLVED | **Never dispatch** |
 
 **Budget cap:** Maximum 2 dispatches per run.
+For every qualifying finding not selected because of the cap, add or preserve
+one Investigation Results row keyed by
+`<!-- investigation-fingerprint:{fingerprint} -->` with
+`⏳ Pending — dispatch budget reached`. Retry that active finding on later runs
+until it is dispatched. Change that same row to `🔄 Dispatched` when selected;
+never append a second row for the same fingerprint.
 **Priority order when cap is hit:**
 1. 🔴 Critical findings first
-2. Pipeline findings before infrastructure
-3. Other categories last
+2. Older pending findings before new findings at the same severity
+3. Pipeline findings before infrastructure
+4. Other categories last
 
 ## 6. Output Templates
 

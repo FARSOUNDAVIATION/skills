@@ -275,8 +275,43 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("do not stop based on comment age", normalized_groom)
         self.assertIn("Integrity filtering can remove items", groom)
         self.assertIn(
-            "include only fetched comments whose `created_at` is within the last 30 days",
+            "Apply the 30-day limit only to unrelated comments",
             normalized_groom,
+        )
+        self.assertIn(
+            "matches an active fingerprint or the hidden",
+            normalized_groom,
+        )
+        self.assertIn("investigation-fingerprint:{fingerprint}", groom)
+        self.assertIn(
+            "`severity` from the `**Severity:** {severity}` line",
+            groom,
+        )
+        self.assertIn("If the marker is present but invalid", groom)
+        self.assertIn("Body starts with `🔍 **Investigation Complete**`", groom)
+        self.assertIn(
+            "exact Worker Run URL in its Result cell",
+            normalized_groom,
+        )
+        self.assertIn(
+            "If zero rows or conflicting rows match",
+            normalized_groom,
+        )
+        self.assertIn(
+            "normalize identical rows with the same fingerprint and Worker Run URL",
+            normalized_groom,
+        )
+        self.assertIn(
+            "Repeated copies with the same fingerprint and URL count as one logical row",
+            normalized_groom,
+        )
+        self.assertIn(
+            "De-duplicate by the hidden fingerprint marker",
+            normalized_groom,
+        )
+        self.assertIn(
+            "| <!-- investigation-fingerprint:{finding_id} -->",
+            groom,
         )
         self.assertIn("Do not stop after the first page", normalized_groom)
         self.assertIn("Do not finish with only a text response", groom)
@@ -358,6 +393,19 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("exclude them from RESOLVED", health_check)
         self.assertIn("pages-build-deployment", health_check)
         self.assertNotIn("GET /repos/{owner}/{repo}/pages", health_check)
+        self.assertIn("Pending — dispatch budget reached", health_check)
+        self.assertIn("Dispatch retry", health_check)
+        self.assertIn("investigation-fingerprint:{fingerprint}", health_check)
+        self.assertIn("update its existing Pending row in place", health_check)
+        self.assertIn("Never retain both Pending and Dispatched rows", health_check)
+        self.assertIn(
+            "each qualifying 📌 EXISTING pending retry",
+            normalized_health,
+        )
+        self.assertNotIn(
+            "Only append new \"🔄 Dispatched\" rows",
+            health_check,
+        )
         self.assertIn("Preserve the previous issue body", health_check)
         self.assertIn("fingerprint to be at most 300 characters", normalized_health)
         self.assertIn("URL at most 500 characters", normalized_health)
@@ -536,6 +584,15 @@ class TokenFailoverTests(unittest.TestCase):
             "`get_job_logs`",
         ):
             self.assertIn(available_tool, investigate_knowledge)
+        for report_field in (
+            "## 🔍 Investigation:",
+            "**Finding ID:**",
+            "**Correlation:**",
+            "**Executive Summary:**",
+            "### Remediation Status",
+        ):
+            self.assertIn(report_field, investigate_knowledge)
+        self.assertNotIn("🔍 **Investigation Complete**", investigate_knowledge)
 
         workflow_tests = yaml.safe_load(TEST_WORKFLOW.read_text(encoding="utf-8"))
         triggers = workflow_tests.get("on", workflow_tests.get(True))

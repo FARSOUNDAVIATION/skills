@@ -425,8 +425,10 @@ Replace the entire issue body with the following structure:
 
 | Finding | Severity | Investigation | First Seen | Result |
 |---------|----------|---------------|------------|--------|
-{Preserve rows from the previous issue body's Investigation Results table (look inside the `<!-- gh-aw-island-start:devops-health-groom -->` block if present). Copy all rows as-is for findings that are still active (appear in New Findings or Existing Findings). Drop rows whose finding is no longer active (resolved). If the previous table uses the old 4-column schema (`| Finding | Severity | Status | Result |`), migrate each row to the new 5-column schema: rename Status to Investigation, and populate First Seen from the finding's `<summary>` line (`first seen YYYY-MM-DD`) or use today's date as fallback. Then append new rows for findings dispatched in the current run:}
-| {finding_title} | {severity_emoji} {severity} | 🔄 Dispatched | {first_seen date} | [⏳ Investigation dispatched — results arriving shortly...]({link_to_dispatched_investigate_run_or_this_health_check_run}) |
+{Index rows by the hidden `<!-- investigation-fingerprint:{fingerprint} -->` marker in the Finding cell. Preserve one row per active fingerprint from the previous issue body's Investigation Results table (look inside the `<!-- gh-aw-island-start:devops-health-groom -->` block if present). Drop rows whose finding is no longer active. If a legacy row has no marker, match it once by its exact active finding title and add the marker. If the previous table uses the old 4-column schema (`| Finding | Severity | Status | Result |`), migrate each row to the new 5-column schema: rename Status to Investigation, and populate First Seen from the finding's `<summary>` line (`first seen YYYY-MM-DD`) or use today's date as fallback. For a finding dispatched in the current run, update its existing Pending row in place; append a row only when no row exists. Never retain both Pending and Dispatched rows for one fingerprint:}
+| <!-- investigation-fingerprint:{fingerprint} --> {finding_title} | {severity_emoji} {severity} | 🔄 Dispatched | {first_seen date} | [⏳ Investigation dispatched — results arriving shortly...]({link_to_dispatched_investigate_run_or_this_health_check_run}) |
+{For every qualifying finding deferred by the cap, add or preserve exactly one row:}
+| <!-- investigation-fingerprint:{fingerprint} --> {finding_title} | {severity_emoji} {severity} | ⏳ Pending — dispatch budget reached | {first_seen date} | Awaiting a later dispatch slot |
 {If no dispatched findings AND no previous rows exist, render the table header with zero data rows.}
 
 ---
@@ -506,7 +508,9 @@ Append a short summary comment for the audit trail:
 > Do NOT skip this step. Do NOT end with a noop before completing dispatches.
 > After creating/updating the health issue, immediately proceed to dispatch.
 
-For each 🆕 NEW finding that qualifies for investigation, dispatch a worker using the `dispatch-workflow` safe-output tool:
+For each qualifying 🆕 NEW finding and each qualifying 📌 EXISTING pending
+retry, apply the rules below and dispatch selected workers with the
+`dispatch-workflow` safe-output tool:
 
 ### 5.1 Dispatch Rules
 
@@ -516,15 +520,23 @@ For each 🆕 NEW finding that qualifies for investigation, dispatch a worker us
 | 🆕 NEW + 🟡 Warning + category `pipeline` | **Dispatch** |
 | 🆕 NEW + 🟡 Warning + category `infra` or `resource` | **Skip** (self-explanatory) |
 | 🆕 NEW + 🔵 Info | **Never dispatch** |
-| 📌 EXISTING (any) | **Never dispatch** |
+| 📌 EXISTING + qualifying + `⏳ Pending` or no investigation row | **Dispatch retry** |
+| 📌 EXISTING + already `🔄 Dispatched` or `✅ Done` | **Never dispatch again** |
 | ✅ RESOLVED (any) | **Never dispatch** |
 
-**First run note:** On the first run all findings are 🆕 NEW. This means ALL critical findings MUST be dispatched.
+For every qualifying finding that is not selected because the run reaches its
+dispatch budget, add or preserve an Investigation Results row with
+`⏳ Pending — dispatch budget reached`. On a later run, treat that active
+EXISTING finding as a dispatch candidate. When selected, replace the pending
+status with `🔄 Dispatched` in the row keyed by its hidden fingerprint marker;
+do not append a second row. This prevents capped findings from becoming
+permanently ineligible or being dispatched more than once.
 
 **Budget:** Maximum **2** dispatches per run (limited to avoid investigation runs cancelling each other due to a shared agent concurrency group — see [gh-aw#20187](https://github.com/github/gh-aw/issues/20187)). If more than 2 qualify, prioritize by:
 1. Severity descending (🔴 first)
-2. Pipeline findings first
-3. Infrastructure findings second
+2. Older pending findings before newly detected findings at the same severity
+3. Pipeline findings first
+4. Infrastructure findings second
 
 ### 5.2 For Each Dispatched Finding
 
@@ -549,7 +561,8 @@ dispatch-workflow:
 
 Before finishing, verify:
 - [ ] At least one `dispatch-workflow` call was made (if any 🔴 critical or qualifying 🟡 warning findings exist)
-- [ ] All 🔴 critical NEW findings have been dispatched (up to budget cap)
+- [ ] Every qualifying finding is either dispatched or has a preserved
+      `⏳ Pending — dispatch budget reached` row
 - [ ] The "🔍 Investigation Results" section in the issue body includes newly dispatched findings as "🔄 Dispatched" and preserves existing rows from the previous body
 - [ ] If no other safe output was emitted, the `noop` summary mentions that zero
       investigations were dispatched
@@ -572,7 +585,7 @@ Before finishing, verify:
   tools. Process API responses and dashboard state in memory. Do not create
   scripts or intermediate files.
 - **CRITICAL — Safe output body must be inline**: When calling `update-issue`, the `body` field must contain the **complete, literal issue body text**. NEVER write the body to a file and use a shell reference like `$(cat file.txt)` — safe outputs are literal JSON strings, not shell-evaluated. Pass the body directly as the string value.
-- **CRITICAL — Investigation Results section**: The `## 🔍 Investigation Results` section MUST always appear in the issue body template. The downstream [grooming workflow](../workflows/devops-health-groom.md) manages this section via a `replace-island` block — so the health-check must **preserve existing rows** from the previous issue body (look inside `<!-- gh-aw-island-start:devops-health-groom -->` markers if present, and copy those table rows into the new section). Do NOT wrap the section in island markers yourself — the groom adds those. Only append new "🔄 Dispatched" rows for findings dispatched in the current run.
+- **CRITICAL — Investigation Results section**: The `## 🔍 Investigation Results` section MUST always appear in the issue body template. The downstream [grooming workflow](../workflows/devops-health-groom.md) manages this section via a `replace-island` block. Index rows by the hidden fingerprint marker, preserve one row for each active finding, update Pending rows to Dispatched in place, and add Pending rows for qualifying findings deferred by the budget. Append a row only when that fingerprint has no row. Do NOT wrap the section in island markers yourself — the groom adds those.
 - **Be data-driven**: Include specific numbers, durations, percentages, and links.
 - **Be precise with fingerprints**: Use the exact fingerprint formulas from the knowledge file. Consistency is critical — the same finding MUST produce the same fingerprint across runs.
 - **First run handling**: If the validated dashboard body has no valid previous
