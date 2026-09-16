@@ -150,7 +150,10 @@ catalog and fingerprint rules:
   and threshold bucket from Actions metadata.
 - For infrastructure findings, evaluate the named repository configuration
   check and derive its fingerprint, category, severity, and title from the
-  trusted file path or repository setting.
+  trusted file path or repository setting. For
+  `infra:pages-deployment-failed`, use the latest completed
+  `pages-build-deployment` Actions workflow run and require a failed conclusion;
+  the Pages deployment API is not available to this worker.
 
 Require the derived canonical `fingerprint`, `category`, and `severity` to match
 `finding_id`, `finding_type`, and `finding_severity` exactly. Treat
@@ -190,7 +193,11 @@ Follow the playbook steps meticulously. For each piece of evidence:
 - Read the relevant repository files and use the GitHub tools for recent commit
   history.
 - Find the last successful run of the same workflow and compare its commit with
-  the failed run.
+  the failed run using bounded `list_commits` and `get_commit` results. If the
+  returned history does not contain both boundary SHAs, report the comparison
+  as incomplete and lower confidence.
+- Find an associated pull request by searching for the exact suspect commit SHA,
+  then verify the candidate with pull-request metadata, files, and diff tools.
 - Search open and closed issues and pull requests for the same failure signature.
 
 ### Step 3: Determine Root Cause

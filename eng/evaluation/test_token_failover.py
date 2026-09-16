@@ -300,6 +300,40 @@ class TokenFailoverTests(unittest.TestCase):
             "Never truncate the authoritative state", normalized_health
         )
         self.assertIn("present but invalid marker is state corruption", normalized_health)
+        self.assertIn(
+            'state_result.status == "invalid"',
+            shared_health := (
+                REPO_ROOT / ".github" / "aw" / "shared" / "devops-health.lock.md"
+            ).read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            "distinct `absent`, `valid`, and `invalid` statuses",
+            " ".join(shared_health.split()),
+        )
+        self.assertIn("unavailable_scopes", shared_health)
+        self.assertIn("carry_forward_unchanged", shared_health)
+        self.assertIn("do not increment their occurrences", shared_health)
+        for scope_mapping in (
+            "`pipeline:{workflow}:{job}:timeout` | P2",
+            "`pipeline:evaluation:failure-rate:{bucket}` | P5",
+            "`pipeline:evaluation:schedule-cancellation:{bucket}` | P6",
+            "`resource:eval-duration:{bucket}` | P3",
+            "`resource:cost-increase` | U3",
+            "`infra:pages-deployment-failed` | I5",
+            "`infra:unpinned-action:{action_name}` | I6",
+            "`infra:orphan-skill:{component}:{skill_name}` | I7",
+            "`infra:orphan-plugin:{directory_basename}` | I8",
+        ):
+            self.assertIn(scope_mapping, shared_health)
+        self.assertIn(
+            "matches no shape or matches more than one shape",
+            " ".join(shared_health.split()),
+        )
+        self.assertIn("complete fingerprint-to-scope table", normalized_health)
+        self.assertIn("smallest affected observation scope", normalized_health)
+        self.assertIn("exclude them from RESOLVED", health_check)
+        self.assertIn("pages-build-deployment", health_check)
+        self.assertNotIn("GET /repos/{owner}/{repo}/pages", health_check)
         self.assertIn("Preserve the previous issue body", health_check)
         self.assertIn("fingerprint to be at most 300 characters", normalized_health)
         self.assertIn("URL at most 500 characters", normalized_health)
@@ -322,9 +356,6 @@ class TokenFailoverTests(unittest.TestCase):
             "do not infer resolution from the visible fallback set",
             normalized_groom,
         )
-        shared_health = (
-            REPO_ROOT / ".github" / "aw" / "shared" / "devops-health.lock.md"
-        ).read_text(encoding="utf-8")
         self.assertIn(
             "The safe-output issue update is the only persistence operation",
             " ".join(shared_health.split()),
@@ -440,6 +471,23 @@ class TokenFailoverTests(unittest.TestCase):
             "Do not fetch logs or report content",
             normalized_investigate,
         )
+        self.assertIn("pages-build-deployment", investigate)
+        self.assertIn("bounded `list_commits` and `get_commit`", investigate)
+        self.assertIn("searching for the exact suspect commit SHA", investigate)
+        investigate_knowledge = (
+            REPO_ROOT / ".github" / "aw" / "shared" / "devops-investigate.lock.md"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("/compare/{success_sha}", investigate_knowledge)
+        self.assertNotIn("/commits/{sha}/pulls", investigate_knowledge)
+        self.assertNotIn("/pages/builds", investigate_knowledge)
+        for available_tool in (
+            "`list_commits`",
+            "`get_commit`",
+            "`search_pull_requests`",
+            "`get_pull_request_files`",
+            "`get_job_logs`",
+        ):
+            self.assertIn(available_tool, investigate_knowledge)
 
     def test_devops_health_report_only_prompt_rejects_untrusted_actions(self) -> None:
         investigate = (

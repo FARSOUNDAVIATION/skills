@@ -62,16 +62,27 @@ fingerprint = "resource:{metric}:{threshold_breach}"
 ## 2. Diff Algorithm
 
 ```
-previous_state = parse_valid_dashboard_state(issue_695_body) ?? {
-    active_findings: [],
-    history: []
-}
+state_result = parse_dashboard_state(issue_695_body)
+if state_result.status == "invalid":
+    emit_noop_and_stop("dashboard state is corrupted")
+if state_result.status == "valid":
+    previous_state = state_result.state
+else:
+    previous_state = migrate_legacy_state(issue_695_body) ?? {
+        active_findings: [],
+        history: []
+    }
 previous_fps = index_by_fingerprint(previous_state.active_findings)
 current_fps  = {}
+unavailable_scopes = {}
 
 for each finding in all_collected_findings:
     fp = compute_fingerprint(finding)
     current_fps[fp] = finding
+
+for each previous finding whose observation scope is in unavailable_scopes:
+    if finding.fingerprint NOT IN current_fps:
+        current_fps[finding.fingerprint] = carry_forward_unchanged(finding)
 
 new_findings      = { fp: f for fp, f in current_fps  if fp NOT IN previous_fps }
 existing_findings = { fp: f for fp, f in current_fps  if fp IN previous_fps }
@@ -79,7 +90,10 @@ resolved_findings = { fp: f for fp, f in previous_fps if fp NOT IN current_fps }
 
 # Update occurrence tracking
 for fp in existing_findings:
-    existing_findings[fp].occurrences = previous_fps[fp].occurrences + 1
+    if existing_findings[fp].was_observed:
+        existing_findings[fp].occurrences = previous_fps[fp].occurrences + 1
+    else:
+        existing_findings[fp].occurrences = previous_fps[fp].occurrences
     existing_findings[fp].first_seen = previous_fps[fp].first_seen
 
 for fp in new_findings:
@@ -95,6 +109,39 @@ next_state = {
     ))
 }
 ```
+
+`parse_dashboard_state` must return distinct `absent`, `valid`, and `invalid`
+statuses. Never convert `invalid` to empty state. An observation scope is the
+smallest check whose successful result can prove that a fingerprint is absent,
+for example P1, P3, I5, or I7. If a check is skipped or incomplete, add that
+scope to `unavailable_scopes`. Carry its previous findings into the next state
+unchanged, exclude them from RESOLVED, do not increment their occurrences, and
+label them as not observed in the visible report. A failure in one scope must
+not suppress resolution decisions for an independently observed scope.
+
+Derive the observation scope from every validated fingerprint. Do not persist
+another field:
+
+| Fingerprint shape | Scope |
+|-------------------|-------|
+| `pipeline:{workflow}:{job}:timeout` | P2 |
+| `pipeline:evaluation:failure-rate:{bucket}` | P5 |
+| `pipeline:evaluation:schedule-cancellation:{bucket}` | P6 |
+| Other `pipeline:{workflow}:{job}:{step}:{conclusion}` | P1 |
+| `resource:eval-duration:{bucket}` | P3 |
+| `resource:cost-increase` | U3 |
+| `infra:no-codeowners` | I1 |
+| `infra:no-dependabot` | I2 |
+| `infra:relaxed-skill-validation` | I3 |
+| `infra:verdict-warn-only` | I4 |
+| `infra:pages-deployment-failed` | I5 |
+| `infra:unpinned-action:{action_name}` | I6 |
+| `infra:orphan-skill:{component}:{skill_name}` | I7 |
+| `infra:orphan-plugin:{directory_basename}` | I8 |
+
+Reject a previous or current fingerprint as invalid if it matches no shape or
+matches more than one shape. Test the specific aggregate and timeout shapes
+before the general pipeline shape.
 
 If `current_fps` contains more than 100 active findings, stop with `noop` before
 classification outputs, dashboard updates, daily comments, or investigation
@@ -309,10 +356,12 @@ surface.
 ### 7.4 Graceful Degradation
 
 If any data source is unavailable:
-- Skip that check category entirely
-- Note the skip in the output: `> ⚠️ Skipped {category} checks: {reason}`
+- Mark the smallest affected observation scope unavailable
+- Note the skip in the output: `> ⚠️ Skipped {scope} check: {reason}`
+- Carry previous findings from that scope forward unchanged
+- Do not increment their occurrence counts or classify them as resolved
 - Do NOT fail the entire workflow
-- Continue with available data
+- Continue classifying independently observed scopes
 
 ### 7.5 Missing or Invalid Previous State
 

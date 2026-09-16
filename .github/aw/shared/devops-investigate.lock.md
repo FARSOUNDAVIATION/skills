@@ -44,19 +44,20 @@ When `finding_type == "pipeline"`:
 5. **Compare: what changed between last success and this failure?**
    - Get the `head_sha` of the last successful run
    - Get the `head_sha` of the failed run
-   - Compare commits between them:
-     ```
-     GET /repos/{owner}/{repo}/compare/{success_sha}...{failure_sha}
-     ```
+   - Use `list_commits` on the default branch and bound the result to commits
+     after the successful SHA through the failed SHA. Use `get_commit` for each
+     candidate SHA.
    - Look for changes to: workflow YAML files, build scripts, `global.json`, dependency files, the code being tested.
+   - If the bounded commit list does not contain both SHAs, state that the
+     change range is incomplete and lower confidence. Do not invent a compare
+     result.
 
 6. **Identify the PR that introduced the breaking change**:
-   - For each suspect commit from the compare, look up the associated PR:
-     ```
-     GET /repos/{owner}/{repo}/commits/{sha}/pulls
-     ```
-   - Record the PR number, title, author, and merge date
-   - Check the PR diff for relevant file changes
+   - For each suspect commit, use `search_pull_requests` with the exact SHA.
+   - Verify candidates with `get_pull_request`, `get_pull_request_files`, and
+     `get_pull_request_diff`.
+   - Record the PR number, title, author, and merge date only for a verified
+     match.
    - This helps attribute the regression and identify who can help fix it
 
 7. **Check if the failure is in repo code or a GitHub Action version update**:
@@ -110,11 +111,11 @@ When `finding_type == "infra"`:
    - Note any compliance or security implications
 
 4. **For Pages deployment failures**:
-   ```
-   GET /repos/{owner}/{repo}/pages/builds
-   ```
-   - Read the latest build log
-   - Identify the failure cause (build error, quota, DNS, etc.)
+   - Use `actions_list` to find the `pages-build-deployment` workflow runs.
+   - Use `actions_get` to verify the latest completed run and its conclusion.
+   - Use the run's jobs and `get_job_logs` for the failed job.
+   - Identify the failure cause from Actions evidence. Do not claim Pages API
+     build, quota, or DNS evidence because that API is not exposed.
 
 ---
 
