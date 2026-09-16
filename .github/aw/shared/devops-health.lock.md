@@ -19,6 +19,10 @@ fingerprint = "pipeline:{workflow_name}:{job_name}:{failed_step}:{conclusion}"
 
 - Normalize `workflow_name` by lowercasing and replacing spaces with hyphens
 - Normalize `job_name` and `failed_step` the same way
+- For workflow, job, step, component, skill, and plugin segments, lowercase and
+  replace each run of characters outside `[a-z0-9._-]` with `-`. An I6 action
+  name may retain its single owner/repository `/`. Fingerprints never contain
+  `@`, whitespace, Markdown delimiters, or mention-triggering text.
 - Same workflow + job + step + conclusion = same finding (even across different run IDs)
 - A workflow that fails in a _different_ step is a _different_ finding
 - For timeouts/cancellations: `pipeline:{workflow_name}:{job_name}:timeout`
@@ -268,17 +272,21 @@ When a finding's fingerprint matches any known-noise pattern (prefix match), dem
 
 ## 5. Investigation Dispatch Rules
 
-Only 🆕 NEW findings that meet these criteria qualify for investigation dispatch:
+Every active `⏳ Pending` row that meets these criteria is eligible for
+reconciliation and investigation dispatch, regardless of whether the finding
+is NEW or EXISTING:
 
 | Condition | Action |
 |-----------|--------|
-| 🆕 + 🔴 Critical | **Always dispatch** |
-| 🆕 + 🟡 Warning + `pipeline` category | **Dispatch** |
-| 🆕 + 🟡 Warning + `infra` or `resource` category | **Skip** |
-| 🆕 + 🔵 Info | **Never dispatch** |
-| 📌 EXISTING or ✅ RESOLVED | **Never dispatch** |
+| Active + `⏳ Pending` + 🔴 Critical | **Reconcile, then dispatch if needed** |
+| Active + `⏳ Pending` + 🟡 Warning + `pipeline` | **Reconcile, then dispatch if needed** |
+| Active + 🟡 Warning + `infra` or `resource` | **No investigation row needed** |
+| Active + 🔵 Info | **No investigation row needed** |
+| `✅ Done` or ✅ RESOLVED | **Never dispatch** |
 
-**Budget cap:** Maximum 2 dispatches per run.
+**Budget cap:** Reconcile all pending rows, then create at most 2 new dispatches
+per run. Rows already queued, running, or backed by a successful correlated
+report do not consume this budget.
 **Priority order when cap is hit:**
 1. 🔴 Critical findings first
 2. Pipeline findings before infrastructure
@@ -349,9 +357,26 @@ If the validated dashboard body has no valid previous state:
 
 Issue `695` is both the human-readable dashboard and the bounded persistence
 surface. Read its previous state only after validating the issue identity. Write
-the next state only inside the replacement body emitted through `update-issue`.
-Do not use files, caches, shell commands, repository edits, or any other storage
-surface.
+the next state only through the transactional `publish-health-dashboard`
+operation. That operation must verify the issue identity and observed
+`updated_at`, replace the body successfully, and only then dispatch
+investigations or post the daily audit comment. Do not use files, caches, shell
+commands, repository edits, or any other storage surface.
+
+Every Investigation Results row must include the finding fingerprint in a
+dedicated `Finding ID` column. Producers, investigators, and groomers correlate
+and de-duplicate exclusively by this ID; titles are display-only. Every active
+finding eligible for investigation must retain a durable row. Rows start as
+`⏳ Pending`, including findings deferred by the two-dispatch budget or a failed
+dispatch attempt. They remain pending until the groomer receives the correlated
+investigation comment and changes the row to `✅ Done`; a dispatch never
+requires a second dashboard write. Pending rows remain eligible on later
+health-check runs. Each pending row stores a hidden, episode-specific
+correlation ID derived from the creating health-check run ID; preserve it until
+the row is resolved or completed. Correlation IDs must be unique across active
+rows. Match investigation reports using both Finding ID and correlation ID.
+Retain a matching bot report for an active pending row regardless of comment
+age; time windows apply only to unrelated or legacy comments.
 
 ### 7.4 Graceful Degradation
 

@@ -1,5 +1,6 @@
 ---
 name: "DevOps Health — Deep Investigation"
+run-name: "DevOps Health Investigation · ${{ inputs.correlation_id }}"
 description: >
   Worker agent that performs deep root-cause analysis on a single
   health check finding (pipeline, infrastructure, or resource).
@@ -84,6 +85,7 @@ imports:
   - uses: shared/pat_pool.md
     with:
       environment: copilot-pat-pool
+  - ../aw/shared/devops-health.lock.md
   - ../aw/shared/devops-investigate.lock.md
 
 environment: copilot-pat-pool

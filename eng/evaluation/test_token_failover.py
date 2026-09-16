@@ -88,6 +88,151 @@ def generated_safe_output_configs(workflow: object) -> list[dict[str, object]]:
     return configs
 
 
+def health_publisher_script() -> str:
+    source = (
+        REPO_ROOT / ".github" / "workflows" / "devops-health-check.md"
+    ).read_text(encoding="utf-8")
+    frontmatter = yaml.safe_load(source.split("---", 2)[1])
+    publisher = frontmatter["safe-outputs"]["jobs"]["publish-health-dashboard"]
+    return next(
+        step["with"]["script"]
+        for step in publisher["steps"]
+        if step.get("name") == "Persist dashboard and run follow-ups"
+    )
+
+
+def run_health_publisher(
+    test_case: unittest.TestCase,
+    item: dict[str, object],
+    *,
+    fail_dispatch_at: int | None = None,
+    fail_update_at: int | None = None,
+    fail_comment: bool = False,
+    existing_correlations: list[str] | None = None,
+    existing_runs: list[dict[str, object]] | None = None,
+    existing_comments: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    node = shutil.which("node")
+    if not node:
+        test_case.skipTest("Node.js is required for publisher behavior tests")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        output_path = temp_path / "agent-output.json"
+        harness_path = temp_path / "publisher-harness.cjs"
+        output_path.write_text(
+            json.dumps({"items": [{"type": "publish_health_dashboard", **item}]}),
+            encoding="utf-8",
+        )
+        fail_dispatch = "null" if fail_dispatch_at is None else str(fail_dispatch_at)
+        fail_update = "null" if fail_update_at is None else str(fail_update_at)
+        run_records = existing_runs or [
+            {
+                "display_title": (
+                    f"DevOps Health Investigation · {correlation}"
+                ),
+                "status": "queued",
+                "conclusion": None,
+            }
+            for correlation in (existing_correlations or [])
+        ]
+        existing_runs_json = json.dumps(run_records)
+        existing_comments_json = json.dumps(existing_comments or [])
+        fail_comment_json = json.dumps(fail_comment)
+        harness_path.write_text(
+            f"""
+const calls = [];
+let dispatchCount = 0;
+let updateCount = 0;
+let currentBody = "";
+const github = {{
+  paginate: async (method, args) => {{
+    const response = await method(args);
+    return response.data.workflow_runs || response.data;
+  }},
+  rest: {{
+    issues: {{
+      get: async args => {{
+        calls.push({{ type: "get", args }});
+        return {{
+          data: {{
+            state: "open",
+            title: "🏥 Repository Health Dashboard",
+            labels: [{{ name: "devops-health" }}],
+            updated_at: "2026-09-16T10:00:00Z",
+            body: currentBody
+          }}
+        }};
+      }},
+      update: async args => {{
+        updateCount += 1;
+        calls.push({{ type: "update", body: args.body }});
+        if ({fail_update} !== null && updateCount === {fail_update}) {{
+          throw new Error(`update ${{updateCount}} failed`);
+        }}
+        currentBody = args.body;
+        return {{ data: {{ body: currentBody }} }};
+      }},
+      createComment: async args => {{
+        calls.push({{ type: "comment", body: args.body }});
+        if ({fail_comment_json}) {{
+          throw new Error("comment failed");
+        }}
+        return {{ data: {{}} }};
+      }},
+      listComments: async args => {{
+        calls.push({{ type: "list-comments", args }});
+        return {{ data: {existing_comments_json} }};
+      }}
+    }},
+    repos: {{
+      get: async args => {{
+        calls.push({{ type: "repo", args }});
+        return {{ data: {{ default_branch: "main" }} }};
+      }}
+    }},
+    actions: {{
+      listWorkflowRuns: async args => {{
+        calls.push({{ type: "list-runs", args }});
+        return {{ data: {{ workflow_runs: {existing_runs_json} }} }};
+      }},
+      createWorkflowDispatch: async args => {{
+        dispatchCount += 1;
+        calls.push({{ type: "dispatch", inputs: args.inputs }});
+        if ({fail_dispatch} !== null && dispatchCount === {fail_dispatch}) {{
+          throw new Error(`dispatch ${{dispatchCount}} failed`);
+        }}
+        return {{ data: {{}} }};
+      }}
+    }}
+  }}
+}};
+const context = {{ repo: {{ owner: "dotnet", repo: "skills" }} }};
+(async () => {{
+{health_publisher_script()}
+}})()
+  .then(() => console.log(JSON.stringify({{ ok: true, calls }})))
+  .catch(error => console.log(JSON.stringify({{
+    ok: false,
+    error: error.message,
+    calls
+  }})));
+""",
+            encoding="utf-8",
+        )
+        environment = os.environ.copy()
+        environment["GH_AW_AGENT_OUTPUT"] = str(output_path)
+        completed = subprocess.run(
+            [node, str(harness_path)],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            env=environment,
+        )
+        return json.loads(completed.stdout.strip())
+
+
 class TokenFailoverTests(unittest.TestCase):
     def test_evaluation_model_profiles_and_judges(self) -> None:
         caller = yaml.safe_load(CALLER_WORKFLOW.read_text(encoding="utf-8"))
@@ -194,7 +339,7 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Missing prior state is not missing data", health_check)
         self.assertIn("Do not call `missing-data`", health_check)
         self.assertIn(
-            "If `update-issue`, `add-comment`, or `dispatch-workflow`",
+            "Never call both `publish_health_dashboard` and `noop`",
             health_check,
         )
         self.assertNotIn("create-issue", health_frontmatter["safe-outputs"])
@@ -204,34 +349,100 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertFalse(
             health_frontmatter["safe-outputs"]["report-incomplete"]
         )
-        for output in ("update-issue", "add-comment"):
-            self.assertEqual(
-                health_frontmatter["safe-outputs"][output]["target"],
-                "695",
-            )
+        for output in ("update-issue", "add-comment", "dispatch-workflow"):
+            self.assertNotIn(output, health_frontmatter["safe-outputs"])
+        publisher = health_frontmatter["safe-outputs"]["jobs"][
+            "publish-health-dashboard"
+        ]
+        self.assertEqual(
+            set(publisher["inputs"]),
+            {
+                "expected_updated_at",
+                "dashboard_body",
+                "daily_comment",
+                "dispatches_json",
+            },
+        )
+        self.assertEqual(
+            publisher["permissions"],
+            {"contents": "read", "issues": "write", "actions": "write"},
+        )
+        self.assertEqual(
+            publisher["if"],
+            "needs.detection.outputs.detection_success == 'true'",
+        )
         self.assertIn("as untrusted data", health_check)
         self.assertIn("Validate every target", health_check)
+        self.assertIn("Dashboard issue identity validation failed", health_check)
+        self.assertIn("publish_health_dashboard` exactly once", health_check)
+        self.assertIn("expected_updated_at", health_check)
+        self.assertIn("dispatches_json", health_check)
+        self.assertIn("at most 100 items", health_check)
         self.assertIn(
-            "has both the exact title `🏥 Repository Health Dashboard` and the "
-            "`devops-health` label",
+            "publisher, not the agent, applies the two-new-dispatch budget",
             normalized_health,
-        )
-        self.assertIn('health_issue_number: "695"', health_check)
-        self.assertEqual(
-            health_frontmatter["safe-outputs"]["dispatch-workflow"]["max"],
-            2,
         )
         health_configs = generated_safe_output_configs(health_lock)
         self.assertEqual(len(health_configs), 2)
         for config in health_configs:
-            self.assertEqual(config["dispatch_workflow"]["max"], 2)
-            self.assertEqual(config["update_issue"]["target"], "695")
-            self.assertEqual(config["add_comment"]["target"], "695")
+            self.assertNotIn("dispatch_workflow", config)
+            self.assertNotIn("update_issue", config)
+            self.assertNotIn("add_comment", config)
             self.assertNotIn("create_issue", config)
             self.assertNotIn("create_report_incomplete_issue", config)
+        self.assertIn('"publish_health_dashboard"', health_lock_text)
+        publisher_job = health_lock["jobs"]["publish_health_dashboard"]
         self.assertIn(
-            "dispatch-workflow [devops_health_investigate](max:2 total)",
-            health_lock_text,
+            "needs.detection.outputs.detection_success == 'true'",
+            publisher_job["if"],
+        )
+        self.assertNotIn("${{", publisher_job["if"])
+        self.assertEqual(
+            publisher_job["permissions"],
+            {"actions": "write", "contents": "read", "issues": "write"},
+        )
+        publisher_script = next(
+            step["with"]["script"]
+            for step in publisher_job["steps"]
+            if step.get("name") == "Persist dashboard and run follow-ups"
+        )
+        self.assertIn("issue.updated_at !== expectedUpdatedAt", publisher_script)
+        self.assertIn("Only github.com links are allowed", publisher_script)
+        self.assertIn("Dashboard state root schema is invalid", publisher_script)
+        self.assertIn("Dashboard active finding schema is invalid", publisher_script)
+        self.assertIn("Dashboard history schema is invalid", publisher_script)
+        self.assertIn(
+            "(dashboardBody.match(/<!-- devops-health-state:v1/g) || []).length !== 1",
+            publisher_script,
+        )
+        self.assertIn(
+            'workflow_id: "devops-health-investigate.lock.yml"',
+            publisher_script,
+        )
+        update_index = publisher_script.index("await github.rest.issues.update")
+        dispatch_index = publisher_script.index(
+            "await github.rest.actions.createWorkflowDispatch"
+        )
+        comment_index = publisher_script.index(
+            "await github.rest.issues.createComment"
+        )
+        self.assertLess(update_index, dispatch_index)
+        self.assertLess(dispatch_index, comment_index)
+        self.assertEqual(
+            publisher_script.count("await github.rest.issues.update"),
+            1,
+        )
+        health_manifest = json.loads(
+            health_lock_text.splitlines()[1].removeprefix("# gh-aw-manifest: ")
+        )
+        safe_output_tools = next(
+            server["tools"]
+            for server in health_manifest["mcp_servers"]
+            if server["name"] == "safeoutputs"
+        )
+        self.assertEqual(
+            safe_output_tools,
+            ["missing_data", "missing_tool", "noop", "publish_health_dashboard"],
         )
         self.assertFalse(groom_frontmatter["tools"]["cli-proxy"])
         self.assertFalse(groom_frontmatter["tools"]["edit"])
@@ -275,9 +486,11 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("do not stop based on comment age", normalized_groom)
         self.assertIn("Integrity filtering can remove items", groom)
         self.assertIn(
-            "include only fetched comments whose `created_at` is within the last 30 days",
+            "whose exact Finding ID and correlation match an active "
+            "Investigation Results row",
             normalized_groom,
         )
+        self.assertIn("older than 30 days", normalized_groom)
         self.assertIn("Do not stop after the first page", normalized_groom)
         self.assertIn("Do not finish with only a text response", groom)
 
@@ -356,6 +569,30 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("complete fingerprint-to-scope table", normalized_health)
         self.assertIn("smallest affected observation scope", normalized_health)
         self.assertIn("exclude them from RESOLVED", health_check)
+        self.assertIn(
+            "| Finding ID | Finding | Severity | Investigation | First Seen | Result |",
+            health_check,
+        )
+        self.assertIn(
+            "Correlate and de-duplicate rows exclusively by the Finding ID fingerprint",
+            health_check,
+        )
+        self.assertIn("Never join by title", groom)
+        self.assertIn(
+            "both its exact `finding_id` and `correlation_id` match",
+            normalized_groom,
+        )
+        self.assertIn("⏳ Pending", health_check)
+        self.assertIn(
+            "Pending rows remain eligible",
+            " ".join(shared_health.split()),
+        )
+        self.assertNotIn("Only 🆕 NEW findings", shared_health)
+        self.assertNotIn("📌 EXISTING or ✅ RESOLVED", shared_health)
+        self.assertLess(
+            groom.index("### 1.1 Parse Authoritative Dashboard State"),
+            groom.index("## Step 2: Fetch Recent Comments"),
+        )
         self.assertIn("pages-build-deployment", health_check)
         self.assertNotIn("GET /repos/{owner}/{repo}/pages", health_check)
         self.assertIn("Preserve the previous issue body", health_check)
@@ -363,11 +600,12 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("URL at most 500 characters", normalized_health)
         self.assertIn("complete body to be at most 60,000 characters", normalized_health)
         self.assertIn(
-            "Do not emit `update-issue`, `add-comment`, or `dispatch-workflow`",
+            "Do not call `publish-health-dashboard`",
             normalized_health,
         )
         self.assertIn(
-            "its `active_findings[].fingerprint` values are the authoritative current active set",
+            "build the authoritative active fingerprint set from "
+            "`active_findings[].fingerprint`",
             normalized_groom,
         )
         self.assertIn("omitted from visible sections", groom)
@@ -378,7 +616,7 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("call `noop` with a state-corruption error", normalized_groom)
         self.assertIn("If the marker is absent", groom)
         self.assertIn(
-            "this fallback is not authoritative for resolution",
+            "This fallback is not authoritative for resolution",
             normalized_groom,
         )
         self.assertIn(
@@ -389,8 +627,595 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("intentionally exposes no shell or CLI proxy", normalized_groom)
         self.assertIn("Never use ordinary `gh`", normalized_groom)
         self.assertIn(
-            "The safe-output issue update is the only persistence operation",
+            "the next state only through the transactional "
+            "`publish-health-dashboard` operation",
             " ".join(shared_health.split()),
+        )
+        self.assertIn(
+            "correlate and de-duplicate exclusively by this ID",
+            " ".join(shared_health.split()),
+        )
+
+    def test_devops_health_publisher_rejects_invalid_state(self) -> None:
+        body = """# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+
+<!-- devops-health-state:v1
+{
+-->
+"""
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": "[]",
+            },
+        )
+
+        self.assertFalse(result["ok"])
+        self.assertIn("Dashboard state JSON is invalid", result["error"])
+        self.assertEqual(result["calls"], [])
+
+        duplicate_finding = {
+            "fingerprint": "infra:no-codeowners",
+            "title": "Missing CODEOWNERS",
+            "severity": "warning",
+            "category": "infra",
+            "url": "https://github.com/dotnet/skills",
+            "first_seen": "2026-09-16",
+            "occurrences": 1,
+        }
+        invalid_state = {
+            "active_findings": [duplicate_finding, duplicate_finding],
+            "history": [],
+        }
+        invalid_body = f"""# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+
+<!-- devops-health-state:v1
+{json.dumps(invalid_state, separators=(",", ":"))}
+-->
+"""
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": invalid_body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": "[]",
+            },
+        )
+
+        self.assertFalse(result["ok"])
+        self.assertIn("Dashboard active finding schema is invalid", result["error"])
+        self.assertEqual(result["calls"], [])
+
+    def test_devops_health_publisher_preserves_pending_dispatches(self) -> None:
+        findings = [
+            {
+                "fingerprint": f"pipeline:evaluation:job-{index}:step:failure",
+                "title": f"Failure {index}",
+                "severity": "critical",
+                "category": "pipeline",
+                "url": f"https://github.com/dotnet/skills/actions/runs/{index}",
+                "first_seen": "2026-09-16",
+                "occurrences": 1,
+            }
+            for index in range(1, 4)
+        ]
+        rows = "\n".join(
+            "| `{fingerprint}` | {title} | 🔴 Critical | ⏳ Pending | "
+            "2026-09-16 | ⏳ Awaiting investigation result "
+            "<!-- correlation:hc-100-{sequence} --> |".format(
+                **finding,
+                sequence=index,
+            )
+            for index, finding in enumerate(findings, start=1)
+        )
+        state = {"active_findings": findings, "history": []}
+        body = f"""# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+{rows}
+
+<!-- devops-health-state:v1
+{json.dumps(state, separators=(",", ":"))}
+-->
+"""
+        dispatches = [
+            {
+                "finding_id": finding["fingerprint"],
+                "finding_type": finding["category"],
+                "finding_title": finding["title"],
+                "finding_severity": finding["severity"],
+                "resource_url": finding["url"],
+                "correlation_id": f"hc-100-{index}",
+            }
+            for index, finding in enumerate(findings, start=1)
+        ]
+
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": json.dumps(dispatches),
+            },
+            fail_dispatch_at=2,
+        )
+
+        self.assertFalse(result["ok"])
+        self.assertIn("dispatch 2 failed", result["error"])
+        self.assertEqual(
+            [call["type"] for call in result["calls"]],
+            [
+                "get",
+                "update",
+                "repo",
+                "list-runs",
+                "dispatch",
+                "dispatch",
+            ],
+        )
+        persisted_bodies = [
+            call["body"] for call in result["calls"] if call["type"] == "update"
+        ]
+        for finding in findings:
+            self.assertIn(
+                f"| `{finding['fingerprint']}` | {finding['title']} | "
+                "🔴 Critical | ⏳ Pending |",
+                persisted_bodies[-1],
+            )
+        self.assertNotIn("comment", [call["type"] for call in result["calls"]])
+
+    def test_devops_health_publisher_rejects_inconsistent_table_and_dispatch(
+        self,
+    ) -> None:
+        finding = {
+            "fingerprint": "pipeline:evaluation:evaluate:test:failure",
+            "title": "Evaluation tests failed",
+            "severity": "critical",
+            "category": "pipeline",
+            "url": "https://github.com/dotnet/skills/actions/runs/43",
+            "first_seen": "2026-09-16",
+            "occurrences": 1,
+        }
+        state_marker = (
+            "<!-- devops-health-state:v1\n"
+            + json.dumps(
+                {"active_findings": [finding], "history": []},
+                separators=(",", ":"),
+            )
+            + "\n-->"
+        )
+        empty_table_body = f"""# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+
+{state_marker}
+"""
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": empty_table_body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": "[]",
+            },
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("Missing Investigation Results row", result["error"])
+        self.assertEqual(result["calls"], [])
+
+        row = (
+            f"| `{finding['fingerprint']}` | {finding['title']} | 🔴 Critical | "
+            "⏳ Pending | 2026-09-16 | ⏳ Awaiting investigation result "
+            "<!-- correlation:hc-101-1 --> |"
+        )
+        body = empty_table_body.replace(
+            "|------------|---------|----------|---------------|------------|--------|\n",
+            "|------------|---------|----------|---------------|------------|--------|\n"
+            f"{row}\n",
+        )
+        mismatch = {
+            "finding_id": finding["fingerprint"],
+            "finding_type": finding["category"],
+            "finding_title": "Different title",
+            "finding_severity": finding["severity"],
+            "resource_url": finding["url"],
+            "correlation_id": "hc-101-1",
+        }
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": json.dumps([mismatch]),
+            },
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("Dispatch does not match pending state", result["error"])
+        self.assertEqual(result["calls"], [])
+
+    def test_devops_health_publisher_reconciles_before_budget(self) -> None:
+        findings = [
+            {
+                "fingerprint": f"pipeline:evaluation:job-{index}:step:failure",
+                "title": f"Failure {index}",
+                "severity": "critical",
+                "category": "pipeline",
+                "url": f"https://github.com/dotnet/skills/actions/runs/{index}",
+                "first_seen": "2026-09-16",
+                "occurrences": 1,
+            }
+            for index in range(1, 4)
+        ]
+        correlations = [f"hc-300-{index}" for index in range(1, 4)]
+        rows = "\n".join(
+            "| `{fingerprint}` | {title} | 🔴 Critical | ⏳ Pending | "
+            "2026-09-16 | ⏳ Awaiting investigation result "
+            "<!-- correlation:{correlation} --> |".format(
+                **finding,
+                correlation=correlation,
+            )
+            for finding, correlation in zip(
+                findings,
+                correlations,
+                strict=True,
+            )
+        )
+        body = f"""# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+{rows}
+
+<!-- devops-health-state:v1
+{json.dumps({"active_findings": findings, "history": []}, separators=(",", ":"))}
+-->
+"""
+        dispatches = [
+            {
+                "finding_id": finding["fingerprint"],
+                "finding_type": finding["category"],
+                "finding_title": finding["title"],
+                "finding_severity": finding["severity"],
+                "resource_url": finding["url"],
+                "correlation_id": correlation,
+            }
+            for finding, correlation in zip(
+                findings,
+                correlations,
+                strict=True,
+            )
+        ]
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": json.dumps(dispatches),
+            },
+            existing_correlations=correlations[:2],
+        )
+
+        self.assertTrue(result["ok"])
+        dispatch_calls = [
+            call for call in result["calls"] if call["type"] == "dispatch"
+        ]
+        self.assertEqual(len(dispatch_calls), 1)
+        self.assertEqual(
+            [call["type"] for call in result["calls"]].count("list-runs"),
+            1,
+        )
+        self.assertNotIn(
+            "list-comments",
+            [call["type"] for call in result["calls"]],
+        )
+        self.assertEqual(
+            dispatch_calls[0]["inputs"]["finding_id"],
+            findings[2]["fingerprint"],
+        )
+
+        successful_runs = [
+            {
+                "display_title": (
+                    f"DevOps Health Investigation · {correlation}"
+                ),
+                "status": "completed",
+                "conclusion": "success",
+            }
+            for correlation in correlations
+        ]
+        successful_comments = [
+            {
+                "user": {"login": "github-actions[bot]"},
+                "body": (
+                    f"**Correlation:** {correlation}\n"
+                    f"**Finding ID:** `{finding['fingerprint']}`"
+                ),
+            }
+            for finding, correlation in zip(
+                findings,
+                correlations,
+                strict=True,
+            )
+        ]
+        reconciled = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": json.dumps(dispatches),
+            },
+            existing_runs=successful_runs,
+            existing_comments=successful_comments,
+        )
+        call_types = [call["type"] for call in reconciled["calls"]]
+        self.assertTrue(reconciled["ok"])
+        self.assertEqual(call_types.count("list-runs"), 1)
+        self.assertEqual(call_types.count("list-comments"), 1)
+        self.assertNotIn("dispatch", call_types)
+
+    def test_devops_health_publisher_validates_episode_correlation(self) -> None:
+        findings = [
+            {
+                "fingerprint": f"pipeline:evaluation:job-{index}:step:failure",
+                "title": f"Failure {index}",
+                "severity": "critical",
+                "category": "pipeline",
+                "url": f"https://github.com/dotnet/skills/actions/runs/{index}",
+                "first_seen": "2026-09-16",
+                "occurrences": 1,
+            }
+            for index in range(1, 3)
+        ]
+        duplicate_correlation = "hc-400-1"
+        rows = "\n".join(
+            "| `{fingerprint}` | {title} | 🔴 Critical | ⏳ Pending | "
+            "2026-09-16 | ⏳ Awaiting investigation result "
+            "<!-- correlation:hc-400-1 --> |".format(**finding)
+            for finding in findings
+        )
+        body = f"""# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+{rows}
+
+<!-- devops-health-state:v1
+{json.dumps({"active_findings": findings, "history": []}, separators=(",", ":"))}
+-->
+"""
+        dispatches = [
+            {
+                "finding_id": finding["fingerprint"],
+                "finding_type": finding["category"],
+                "finding_title": finding["title"],
+                "finding_severity": finding["severity"],
+                "resource_url": finding["url"],
+                "correlation_id": duplicate_correlation,
+            }
+            for finding in findings
+        ]
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": body,
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": json.dumps(dispatches),
+            },
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("Pending row has invalid correlation", result["error"])
+        self.assertEqual(result["calls"], [])
+
+    def test_devops_health_publisher_reconciles_accepted_dispatch(self) -> None:
+        finding = {
+            "fingerprint": "pipeline:evaluation:evaluate:build:failure",
+            "title": "Evaluation build failed",
+            "severity": "critical",
+            "category": "pipeline",
+            "url": "https://github.com/dotnet/skills/actions/runs/42",
+            "first_seen": "2026-09-16",
+            "occurrences": 1,
+        }
+        row = (
+            f"| `{finding['fingerprint']}` | {finding['title']} | 🔴 Critical | "
+            "⏳ Pending | 2026-09-16 | ⏳ Awaiting investigation result "
+            "<!-- correlation:hc-102-1 --> |"
+        )
+        body = f"""# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+{row}
+
+<!-- devops-health-state:v1
+{json.dumps({"active_findings": [finding], "history": []}, separators=(",", ":"))}
+-->
+"""
+        dispatch = {
+            "finding_id": finding["fingerprint"],
+            "finding_type": finding["category"],
+            "finding_title": finding["title"],
+            "finding_severity": finding["severity"],
+            "resource_url": finding["url"],
+            "correlation_id": "hc-102-1",
+        }
+        item = {
+            "expected_updated_at": "2026-09-16T10:00:00Z",
+            "dashboard_body": body,
+            "daily_comment": "## 📋 Health Check — 2026-09-16",
+            "dispatches_json": json.dumps([dispatch]),
+        }
+
+        failed = run_health_publisher(self, item, fail_comment=True)
+        self.assertFalse(failed["ok"])
+        self.assertIn("comment failed", failed["error"])
+        dispatch_call = next(
+            call for call in failed["calls"] if call["type"] == "dispatch"
+        )
+        correlation = dispatch_call["inputs"]["correlation_id"]
+
+        retried = run_health_publisher(
+            self,
+            item,
+            existing_correlations=[correlation],
+        )
+        self.assertTrue(retried["ok"])
+        self.assertNotIn(
+            "dispatch",
+            [call["type"] for call in retried["calls"]],
+        )
+        self.assertIn(
+            f"| `{finding['fingerprint']}` | {finding['title']} | "
+            "🔴 Critical | ⏳ Pending |",
+            [
+                call["body"]
+                for call in retried["calls"]
+                if call["type"] == "update"
+            ][-1],
+        )
+        self.assertEqual(retried["calls"][-1]["type"], "comment")
+
+        for active_status in ("requested", "pending", "waiting"):
+            with self.subTest(active_status=active_status):
+                active = run_health_publisher(
+                    self,
+                    item,
+                    existing_runs=[
+                        {
+                            "display_title": (
+                                f"DevOps Health Investigation · {correlation}"
+                            ),
+                            "status": active_status,
+                            "conclusion": None,
+                        }
+                    ],
+                )
+                self.assertTrue(active["ok"])
+                self.assertNotIn(
+                    "dispatch",
+                    [call["type"] for call in active["calls"]],
+                )
+
+        failed_run = run_health_publisher(
+            self,
+            item,
+            existing_runs=[
+                {
+                    "display_title": (
+                        f"DevOps Health Investigation · {correlation}"
+                    ),
+                    "status": "completed",
+                    "conclusion": "failure",
+                }
+            ],
+        )
+        self.assertTrue(failed_run["ok"])
+        self.assertIn(
+            "dispatch",
+            [call["type"] for call in failed_run["calls"]],
+        )
+
+        wrong_finding_comment = run_health_publisher(
+            self,
+            item,
+            existing_runs=[
+                {
+                    "display_title": (
+                        f"DevOps Health Investigation · {correlation}"
+                    ),
+                    "status": "completed",
+                    "conclusion": "success",
+                }
+            ],
+            existing_comments=[
+                {
+                    "user": {"login": "github-actions[bot]"},
+                    "body": (
+                        f"**Correlation:** {correlation}\n"
+                        "**Finding ID:** `pipeline:other:job:step:failure`"
+                    ),
+                }
+            ],
+        )
+        self.assertTrue(wrong_finding_comment["ok"])
+        self.assertIn(
+            "dispatch",
+            [call["type"] for call in wrong_finding_comment["calls"]],
+        )
+
+    def test_devops_health_publisher_allows_action_references(self) -> None:
+        finding = {
+            "fingerprint": "infra:unpinned-action:owner/action",
+            "title": "owner/action@v1 is not SHA-pinned",
+            "severity": "info",
+            "category": "infra",
+            "url": "https://github.com/dotnet/skills/blob/main/.github/workflows/example.yml",
+            "first_seen": "2026-09-16",
+            "occurrences": 1,
+        }
+        body = f"""# 🏥 Daily Health Check — 2026-09-16
+
+## 🆕 New Findings
+
+`owner/action@v1` should use a commit SHA.
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+
+<!-- devops-health-state:v1
+{json.dumps({"active_findings": [finding], "history": []}, separators=(",", ":"))}
+-->
+"""
+        result = run_health_publisher(
+            self,
+            {
+                "expected_updated_at": "2026-09-16T10:00:00Z",
+                "dashboard_body": body,
+                "daily_comment": (
+                    "## 📋 Health Check — 2026-09-16\n\n"
+                    "Found `owner/action@v1`."
+                ),
+                "dispatches_json": "[]",
+            },
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(
+            [call["type"] for call in result["calls"]],
+            ["get", "update", "repo", "comment"],
         )
 
     def test_devops_health_investigation_is_report_only(self) -> None:
@@ -525,6 +1350,10 @@ class TokenFailoverTests(unittest.TestCase):
         investigate_knowledge = (
             REPO_ROOT / ".github" / "aw" / "shared" / "devops-investigate.lock.md"
         ).read_text(encoding="utf-8")
+        self.assertIn(
+            "../aw/shared/devops-health.lock.md",
+            investigate_frontmatter["imports"],
+        )
         self.assertNotIn("/compare/{success_sha}", investigate_knowledge)
         self.assertNotIn("/commits/{sha}/pulls", investigate_knowledge)
         self.assertNotIn("/pages/builds", investigate_knowledge)
@@ -601,11 +1430,26 @@ class TokenFailoverTests(unittest.TestCase):
 
     def test_gh_aw_runtime_upgrade_is_complete(self) -> None:
         workflows = REPO_ROOT / ".github" / "workflows"
+        action_lock_text = (
+            REPO_ROOT / ".github" / "aw" / "actions-lock.json"
+        ).read_text(encoding="utf-8")
+        duplicate_keys: list[str] = []
+
+        def reject_duplicate_keys(
+            pairs: list[tuple[str, object]],
+        ) -> dict[str, object]:
+            result: dict[str, object] = {}
+            for key, value in pairs:
+                if key in result:
+                    duplicate_keys.append(key)
+                result[key] = value
+            return result
+
         actions_lock = json.loads(
-            (REPO_ROOT / ".github" / "aw" / "actions-lock.json").read_text(
-                encoding="utf-8"
-            )
+            action_lock_text,
+            object_pairs_hook=reject_duplicate_keys,
         )
+        self.assertEqual(duplicate_keys, [])
 
         setup_sha = "5e508589e03a7757a7e05b26e834292f5445bfb6"
         for action in ("setup", "setup-cli"):
