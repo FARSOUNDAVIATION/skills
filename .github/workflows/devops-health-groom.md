@@ -496,12 +496,7 @@ safe-outputs:
                   /^hc-\d{4}-\d{2}-\d{2}-\d+-\d+$/.test(row.correlation_id);
                 if (
                   (
-                    ["dispatching", "done"].includes(row.status) &&
-                    !validCorrelation
-                  ) ||
-                  (
-                    row.status === "dispatched" &&
-                    row.correlation_id !== "" &&
+                    ["dispatching", "dispatched", "done"].includes(row.status) &&
                     !validCorrelation
                   ) ||
                   (

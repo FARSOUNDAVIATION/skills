@@ -104,6 +104,57 @@ safe-outputs:
               }
 
               const item = items[0];
+              const validateLinkDestination = destination => {
+                if (destination.startsWith("#")) {
+                  return;
+                }
+                if (destination.startsWith("//")) {
+                  throw new Error(
+                    `Protocol-relative links are not allowed: ${destination}`
+                  );
+                }
+                let link;
+                try {
+                  link = new URL(destination);
+                } catch {
+                  throw new Error(
+                    `Only absolute github.com links are allowed: ${destination}`
+                  );
+                }
+                if (
+                  link.protocol !== "https:" ||
+                  link.hostname !== "github.com"
+                ) {
+                  throw new Error(
+                    `Only github.com links are allowed: ${link.href}`
+                  );
+                }
+              };
+              const validateGitHubLinks = value => {
+                const rendered = value
+                  .replace(/```[\s\S]*?```/g, "")
+                  .replace(/`[^`\n]*`/g, "");
+                for (const match of rendered.matchAll(
+                  /https?:\/\/[^\s)<>"']+/gi
+                )) {
+                  validateLinkDestination(
+                    match[0].replace(/[.,;:!?]+$/, "")
+                  );
+                }
+                if (/(^|[^A-Za-z0-9@])www\.[A-Za-z0-9]/im.test(rendered)) {
+                  throw new Error("Bare www links are not allowed");
+                }
+                for (const match of rendered.matchAll(
+                  /!?\[[^\]\r\n]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g
+                )) {
+                  validateLinkDestination(match[1]);
+                }
+                for (const match of rendered.matchAll(
+                  /(?:href|src)\s*=\s*["']([^"']+)["']/gi
+                )) {
+                  validateLinkDestination(match[1]);
+                }
+              };
               const stateToken = "DEVOPS_HEALTH_STATE_SLOT_V1";
               const rowsToken = "DEVOPS_HEALTH_INVESTIGATION_ROWS_SLOT_V1";
               const countToken = (text, token) => text.split(token).length - 1;
@@ -149,6 +200,13 @@ safe-outputs:
                 !item.comment_body.startsWith("## 📋 Health Check — ")
               ) {
                 core.setFailed("Audit comment is missing, oversized, or has the wrong heading");
+                return;
+              }
+              try {
+                validateGitHubLinks(item.body);
+                validateGitHubLinks(item.comment_body);
+              } catch (error) {
+                core.setFailed(error.message);
                 return;
               }
 
@@ -511,6 +569,9 @@ safe-outputs:
                 const fingerprintMatch = line.match(
                   /#investigation-fingerprint:([^)]*)\)/
                 );
+                const legacyFingerprintMatch = line.match(
+                  /<!-- investigation-fingerprint:[^>\r\n]+-->/
+                );
                 const correlationMatch = line.match(
                   /#investigation-correlation:(hc-\d{4}-\d{2}-\d{2}-\d+-\d+)\)/
                 );
@@ -519,6 +580,16 @@ safe-outputs:
                   : line.includes("🔄 Dispatched")
                     ? "dispatched"
                     : null;
+                if (
+                  outboxStatus &&
+                  !legacyFingerprintMatch &&
+                  (!fingerprintMatch || !correlationMatch)
+                ) {
+                  core.setFailed(
+                    "Dashboard contains an in-flight row without valid identity markers"
+                  );
+                  return;
+                }
                 if (fingerprintMatch && correlationMatch && outboxStatus) {
                   try {
                     const fingerprint = decodeURIComponent(fingerprintMatch[1]);
@@ -619,12 +690,7 @@ safe-outputs:
                   /^hc-\d{4}-\d{2}-\d{2}-\d+-\d+$/.test(row.correlation_id);
                 if (
                   (
-                    ["dispatching", "done"].includes(row.status) &&
-                    !validCorrelation
-                  ) ||
-                  (
-                    row.status === "dispatched" &&
-                    row.correlation_id !== "" &&
+                    ["dispatching", "dispatched", "done"].includes(row.status) &&
                     !validCorrelation
                   ) ||
                   (
@@ -1304,7 +1370,7 @@ Replace the entire issue body with the following structure:
 ## 🔍 Investigation Results
 
 > Deep investigations are dispatched for new critical/warning findings.
-> The [grooming workflow](../workflows/devops-health-groom.md) links results ~3 hours after this run.
+> The grooming workflow links results ~3 hours after this run.
 
 | Finding | Severity | Investigation | First Seen | Result |
 |---------|----------|---------------|------------|--------|

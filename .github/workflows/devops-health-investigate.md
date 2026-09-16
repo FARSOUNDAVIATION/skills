@@ -99,6 +99,12 @@ safe-outputs:
             script: |
               const fs = require("fs");
 
+              if (context.actor !== "github-actions[bot]") {
+                core.setFailed(
+                  "Investigation publication requires github-actions[bot] provenance"
+                );
+                return;
+              }
               const outputPath = process.env.GH_AW_AGENT_OUTPUT;
               if (!outputPath) {
                 core.setFailed("GH_AW_AGENT_OUTPUT is not set");
@@ -137,6 +143,72 @@ safe-outputs:
                 body.includes("<!-- devops-health-state:v1")
               ) {
                 core.setFailed("Investigation publication input failed validation");
+                return;
+              }
+
+              const validateLinkDestination = destination => {
+                if (destination.startsWith("#")) {
+                  return;
+                }
+                if (destination.startsWith("//")) {
+                  throw new Error(
+                    `Protocol-relative links are not allowed: ${destination}`
+                  );
+                }
+                let link;
+                try {
+                  link = new URL(destination);
+                } catch {
+                  throw new Error(
+                    `Only absolute github.com links are allowed: ${destination}`
+                  );
+                }
+                if (
+                  link.protocol !== "https:" ||
+                  link.hostname !== "github.com"
+                ) {
+                  throw new Error(
+                    `Only github.com links are allowed: ${link.href}`
+                  );
+                }
+              };
+              const validateGitHubLinks = value => {
+                const rendered = value
+                  .replace(/```[\s\S]*?```/g, "")
+                  .replace(/`[^`\n]*`/g, "");
+                for (const match of rendered.matchAll(
+                  /https?:\/\/[^\s)<>"']+/gi
+                )) {
+                  validateLinkDestination(
+                    match[0].replace(/[.,;:!?]+$/, "")
+                  );
+                }
+                if (/(^|[^A-Za-z0-9@])www\.[A-Za-z0-9]/im.test(rendered)) {
+                  throw new Error("Bare www links are not allowed");
+                }
+                for (const match of rendered.matchAll(
+                  /!?\[[^\]\r\n]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g
+                )) {
+                  validateLinkDestination(match[1]);
+                }
+                for (const match of rendered.matchAll(
+                  /(?:href|src)\s*=\s*["']([^"']+)["']/gi
+                )) {
+                  validateLinkDestination(match[1]);
+                }
+                return rendered;
+              };
+              let renderedBody;
+              try {
+                renderedBody = validateGitHubLinks(body);
+              } catch (error) {
+                core.setFailed(error.message);
+                return;
+              }
+              if (
+                /(^|[^A-Za-z0-9._%+-])@[A-Za-z0-9]/m.test(renderedBody)
+              ) {
+                core.setFailed("Investigation report contains an unsafe mention");
                 return;
               }
 

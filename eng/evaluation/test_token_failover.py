@@ -302,6 +302,16 @@ class TokenFailoverTests(unittest.TestCase):
             "Dashboard body is missing required publication placeholders",
             health_lock_text,
         )
+        self.assertIn("Only github.com links are allowed", health_lock_text)
+        self.assertIn(
+            "Only absolute github.com links are allowed",
+            health_lock_text,
+        )
+        self.assertIn(
+            "Protocol-relative links are not allowed",
+            health_lock_text,
+        )
+        self.assertIn("Bare www links are not allowed", health_lock_text)
         self.assertIn(
             'item.body.includes("<!-- devops-health-state:v1")',
             health_lock_text,
@@ -436,6 +446,11 @@ class TokenFailoverTests(unittest.TestCase):
             health_lock_text,
         )
         self.assertIn(
+            "Dashboard contains an in-flight row without valid identity markers",
+            health_lock_text,
+        )
+        self.assertIn("legacyFingerprintMatch", health_lock_text)
+        self.assertIn(
             "priorOutbox.get(dispatch.finding_id)?.correlation",
             health_lock_text,
         )
@@ -540,7 +555,7 @@ class TokenFailoverTests(unittest.TestCase):
             groom_lock_text,
         )
         self.assertIn(
-            '["dispatching", "done"].includes(row.status)',
+            '["dispatching", "dispatched", "done"].includes(row.status)',
             groom_lock_text,
         )
         for lock_text in (health_lock_text, groom_lock_text):
@@ -889,6 +904,16 @@ class TokenFailoverTests(unittest.TestCase):
             investigate_lock_text,
         )
         self.assertIn(
+            "Investigation publication requires github-actions[bot] provenance",
+            investigate_lock_text,
+        )
+        self.assertIn("Only github.com links are allowed", investigate_lock_text)
+        self.assertIn(
+            "Investigation report contains an unsafe mention",
+            investigate_lock_text,
+        )
+        self.assertIn("Bare www links are not allowed", investigate_lock_text)
+        self.assertIn(
             "github.rest.issues.createComment",
             investigate_lock_text,
         )
@@ -923,6 +948,21 @@ class TokenFailoverTests(unittest.TestCase):
             "hc-{YYYY-MM-DD}-{numeric_health_run_id}-{numeric_sequence}",
             investigate,
         )
+        investigate_knowledge = (
+            REPO_ROOT / ".github" / "aw" / "shared" / "devops-investigate.lock.md"
+        ).read_text(encoding="utf-8")
+        for supported_method in (
+            "`pull_request_read`",
+            "`get_files`",
+            "`get_diff`",
+        ):
+            self.assertIn(supported_method, investigate_knowledge)
+        for unsupported_tool in (
+            "`get_pull_request`",
+            "`get_pull_request_files`",
+            "`get_pull_request_diff`",
+        ):
+            self.assertNotIn(unsupported_tool, investigate_knowledge)
 
     def test_devops_health_investigator_has_no_mutating_tools(self) -> None:
         workflows = REPO_ROOT / ".github" / "workflows"
@@ -1001,7 +1041,9 @@ class TokenFailoverTests(unittest.TestCase):
             "`list_commits`",
             "`get_commit`",
             "`search_pull_requests`",
-            "`get_pull_request_files`",
+            "`pull_request_read`",
+            "`get_files`",
+            "`get_diff`",
             "`get_job_logs`",
         ):
             self.assertIn(available_tool, investigate_knowledge)
