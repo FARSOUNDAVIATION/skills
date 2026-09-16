@@ -1219,6 +1219,29 @@ class TokenFailoverTests(unittest.TestCase):
             ["get"],
         )
 
+        legacy_body = """# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding | Severity | Status | Result |
+|---------|----------|--------|--------|
+| Legacy finding | 🟡 Warning | ⏳ Pending | Waiting |
+
+<!-- devops-health-state:v1
+{"active_findings":[],"history":[]}
+-->
+"""
+        migrated_legacy = run_groom_publisher(
+            self,
+            prior_body=legacy_body,
+            section=empty_section,
+        )
+        self.assertTrue(migrated_legacy["ok"])
+        self.assertEqual(
+            [call["type"] for call in migrated_legacy["calls"]],
+            ["get", "get", "update"],
+        )
+
     def test_devops_health_publisher_rejects_invalid_state(self) -> None:
         body = """# 🏥 Daily Health Check — 2026-09-16
 
@@ -1244,6 +1267,39 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("Dashboard state JSON is invalid", result["error"])
         self.assertEqual(result["calls"], [])
+
+        observed_corrupt = run_health_publisher(
+            self,
+            {
+                "dashboard_body": (
+                    "# 🏥 Daily Health Check — 2026-09-16\n\n"
+                    "## 🆕 New Findings (0)\n\n"
+                    "## 🔍 Investigation Results\n\n"
+                    "| Finding ID | Finding | Severity | Investigation | First Seen | Result |\n"
+                    "|------------|---------|----------|---------------|------------|--------|\n\n"
+                    "## ✅ Resolved Since Yesterday (0)\n\n"
+                    "## 📌 Existing Findings (0)\n\n"
+                    "## 📊 Trends (7-day)\n\n"
+                    "<!-- devops-health-state:v1\n"
+                    '{"active_findings":[],"history":[]}\n-->'
+                ),
+                "daily_comment": "## 📋 Health Check — 2026-09-16",
+                "dispatches_json": "[]",
+            },
+            initial_body=(
+                "# 🏥 Daily Health Check — 2026-09-15\n"
+                "<!-- devops-health-state:v1\n{\n-->"
+            ),
+        )
+        self.assertFalse(observed_corrupt["ok"])
+        self.assertIn(
+            "Observed dashboard state JSON is invalid",
+            observed_corrupt["error"],
+        )
+        self.assertEqual(
+            [call["type"] for call in observed_corrupt["calls"]],
+            ["get"],
+        )
 
         incomplete_template_body = """# 🏥 Daily Health Check — 2026-09-16
 
@@ -1682,7 +1738,7 @@ class TokenFailoverTests(unittest.TestCase):
             "⏳ Awaiting investigation result",
             "[unsafe](//attacker.example/path)",
         )
-        rejected_restore = run_health_publisher(
+        not_restored = run_health_publisher(
             self,
             {
                 "dashboard_body": active_info_body,
@@ -1691,15 +1747,13 @@ class TokenFailoverTests(unittest.TestCase):
             },
             initial_body=unsafe_prior,
         )
-        self.assertFalse(rejected_restore["ok"])
-        self.assertIn(
-            "Protocol-relative links are not allowed",
-            rejected_restore["error"],
+        self.assertTrue(not_restored["ok"])
+        updated_body = next(
+            call["body"]
+            for call in not_restored["calls"]
+            if call["type"] == "update"
         )
-        self.assertEqual(
-            [call["type"] for call in rejected_restore["calls"]],
-            ["get"],
-        )
+        self.assertNotIn("attacker.example", updated_body)
 
     def test_devops_health_publisher_reconciles_before_budget(self) -> None:
         findings = [
@@ -2352,6 +2406,32 @@ class TokenFailoverTests(unittest.TestCase):
         self.assertIn("Dashboard active finding is invalid", invalid_state["error"])
         self.assertEqual(
             [call["type"] for call in invalid_state["calls"]],
+            ["get-run", "get-issue"],
+        )
+
+        inactive_state_body = """# 🏥 Daily Health Check — 2026-09-16
+
+## 🔍 Investigation Results
+
+| Finding ID | Finding | Severity | Investigation | First Seen | Result |
+|------------|---------|----------|---------------|------------|--------|
+| `pipeline:evaluation:evaluate:test:failure` | Evaluation tests failed | 🔴 Critical | ⏳ Pending | 2026-09-16 | ⏳ Awaiting investigation result <!-- correlation:hc-123-1 --> |
+
+<!-- devops-health-state:v1
+{"active_findings":[],"history":[]}
+-->
+"""
+        inactive = run_investigation_publisher(
+            self,
+            dashboard_body_override=inactive_state_body,
+        )
+        self.assertFalse(inactive["ok"])
+        self.assertIn(
+            "title or severity does not match the pending row",
+            inactive["error"],
+        )
+        self.assertEqual(
+            [call["type"] for call in inactive["calls"]],
             ["get-run", "get-issue"],
         )
 

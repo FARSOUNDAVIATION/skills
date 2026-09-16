@@ -162,7 +162,7 @@ safe-outputs:
 
               const islandPattern =
                 /(^|\n)## 🔍 Investigation Results\n[\s\S]*?(?=\n## |\n<!-- devops-health-state:v1|$)/;
-              const parseRows = value => {
+              const parseRows = (value, allowLegacy = false) => {
                 const rows = new Map();
                 const correlations = new Set();
                 for (const line of value.split("\n")) {
@@ -182,6 +182,9 @@ safe-outputs:
                     /^\| `([^`]+)` \| ([^|]*) \| ([^|]*) \| (⏳ Pending|🔄 Dispatched|✅ Done) \| ([^|]*) \| (.*) \|$/
                   );
                   if (!match) {
+                    if (allowLegacy && !trimmedLine.startsWith("| `")) {
+                      continue;
+                    }
                     throw new Error(
                       `Malformed Investigation Results row: ${trimmedLine}`
                     );
@@ -344,7 +347,7 @@ safe-outputs:
               }
               const newRows = parseRows(section);
               const priorIsland = (issue.body || "").match(islandPattern)?.[0] || "";
-              const priorRows = parseRows(priorIsland);
+              const priorRows = parseRows(priorIsland, true);
               const severityLabels = {
                 critical: "🔴 Critical",
                 warning: "🟡 Warning",

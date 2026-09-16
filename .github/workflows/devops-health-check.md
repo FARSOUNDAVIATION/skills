@@ -242,87 +242,91 @@ safe-outputs:
                     ? validNonNegativeNumber(metric)
                     : validMetricObject(metric)
                 );
-              if (
-                !exactKeys(state, ["active_findings", "history"]) ||
-                !Array.isArray(state.active_findings) ||
-                state.active_findings.length > 100 ||
-                !Array.isArray(state.history) ||
-                state.history.length > 14
-              ) {
-                throw new Error("Dashboard state root schema is invalid");
-              }
+              const validateState = candidate => {
+                if (
+                  !exactKeys(candidate, ["active_findings", "history"]) ||
+                  !Array.isArray(candidate.active_findings) ||
+                  candidate.active_findings.length > 100 ||
+                  !Array.isArray(candidate.history) ||
+                  candidate.history.length > 14
+                ) {
+                  throw new Error("Dashboard state root schema is invalid");
+                }
 
-              const fingerprints = new Set();
-              const stateFindings = new Map();
-              for (const finding of state.active_findings) {
-                if (
-                  !exactKeys(finding, [
-                    "fingerprint",
-                    "title",
-                    "severity",
-                    "category",
-                    "url",
-                    "first_seen",
-                    "occurrences",
-                  ]) ||
-                  typeof finding.fingerprint !== "string" ||
-                  finding.fingerprint.length === 0 ||
-                  finding.fingerprint.length > 300 ||
-                  !validFingerprint(finding.fingerprint) ||
-                  fingerprints.has(finding.fingerprint) ||
-                  !allowedTypes.has(finding.category) ||
-                  !finding.fingerprint.startsWith(`${finding.category}:`) ||
-                  !allowedSeverities.has(finding.severity) ||
-                  typeof finding.title !== "string" ||
-                  finding.title.length === 0 ||
-                  finding.title.length > 200 ||
-                  /[\r\n|]/.test(finding.title) ||
-                  typeof finding.url !== "string" ||
-                  finding.url.length > 500 ||
-                  !validDate(finding.first_seen) ||
-                  !Number.isInteger(finding.occurrences) ||
-                  finding.occurrences < 0
-                ) {
-                  throw new Error("Dashboard active finding schema is invalid");
+                const fingerprints = new Set();
+                const findings = new Map();
+                for (const finding of candidate.active_findings) {
+                  if (
+                    !exactKeys(finding, [
+                      "fingerprint",
+                      "title",
+                      "severity",
+                      "category",
+                      "url",
+                      "first_seen",
+                      "occurrences",
+                    ]) ||
+                    typeof finding.fingerprint !== "string" ||
+                    finding.fingerprint.length === 0 ||
+                    finding.fingerprint.length > 300 ||
+                    !validFingerprint(finding.fingerprint) ||
+                    fingerprints.has(finding.fingerprint) ||
+                    !allowedTypes.has(finding.category) ||
+                    !finding.fingerprint.startsWith(`${finding.category}:`) ||
+                    !allowedSeverities.has(finding.severity) ||
+                    typeof finding.title !== "string" ||
+                    finding.title.length === 0 ||
+                    finding.title.length > 200 ||
+                    /[\r\n|]/.test(finding.title) ||
+                    typeof finding.url !== "string" ||
+                    finding.url.length > 500 ||
+                    !validDate(finding.first_seen) ||
+                    !Number.isInteger(finding.occurrences) ||
+                    finding.occurrences < 0
+                  ) {
+                    throw new Error("Dashboard active finding schema is invalid");
+                  }
+                  const findingUrl = new URL(finding.url);
+                  const repositoryPath = `/${context.repo.owner}/${context.repo.repo}`;
+                  if (
+                    findingUrl.protocol !== "https:" ||
+                    findingUrl.hostname !== "github.com" ||
+                    findingUrl.username ||
+                    findingUrl.password ||
+                    !(
+                      findingUrl.pathname === repositoryPath ||
+                      findingUrl.pathname.startsWith(`${repositoryPath}/`)
+                    )
+                  ) {
+                    throw new Error("Dashboard active finding URL is invalid");
+                  }
+                  fingerprints.add(finding.fingerprint);
+                  findings.set(finding.fingerprint, finding);
                 }
-                const findingUrl = new URL(finding.url);
-                const repositoryPath = `/${context.repo.owner}/${context.repo.repo}`;
-                if (
-                  findingUrl.protocol !== "https:" ||
-                  findingUrl.hostname !== "github.com" ||
-                  findingUrl.username ||
-                  findingUrl.password ||
-                  !(
-                    findingUrl.pathname === repositoryPath ||
-                    findingUrl.pathname.startsWith(`${repositoryPath}/`)
-                  )
-                ) {
-                  throw new Error("Dashboard active finding URL is invalid");
-                }
-                fingerprints.add(finding.fingerprint);
-                stateFindings.set(finding.fingerprint, finding);
-              }
 
-              for (const entry of state.history) {
-                if (
-                  !exactKeys(entry, [
-                    "date",
-                    "new_count",
-                    "existing_count",
-                    "resolved_count",
-                    "by_severity",
-                    "metrics",
-                  ]) ||
-                  !validDate(entry.date) ||
-                  !validNonNegativeNumber(entry.new_count) ||
-                  !validNonNegativeNumber(entry.existing_count) ||
-                  !validNonNegativeNumber(entry.resolved_count) ||
-                  !validMetricObject(entry.by_severity) ||
-                  !validMetricObject(entry.metrics)
-                ) {
-                  throw new Error("Dashboard history schema is invalid");
+                for (const entry of candidate.history) {
+                  if (
+                    !exactKeys(entry, [
+                      "date",
+                      "new_count",
+                      "existing_count",
+                      "resolved_count",
+                      "by_severity",
+                      "metrics",
+                    ]) ||
+                    !validDate(entry.date) ||
+                    !validNonNegativeNumber(entry.new_count) ||
+                    !validNonNegativeNumber(entry.existing_count) ||
+                    !validNonNegativeNumber(entry.resolved_count) ||
+                    !validMetricObject(entry.by_severity) ||
+                    !validMetricObject(entry.metrics)
+                  ) {
+                    throw new Error("Dashboard history schema is invalid");
+                  }
                 }
-              }
+                return findings;
+              };
+              const stateFindings = validateState(state);
 
               let dispatches;
               try {
@@ -580,6 +584,27 @@ safe-outputs:
               });
               const observedUpdatedAt = issue.updated_at;
               const observedBody = issue.body || "";
+              const observedMarkerPrefixes =
+                observedBody.match(/<!-- devops-health-state:v1/g) || [];
+              if (observedMarkerPrefixes.length > 0) {
+                const observedMarkers = [
+                  ...observedBody.matchAll(
+                    /<!-- devops-health-state:v1\s*\n([\s\S]*?)\n-->/g
+                  ),
+                ];
+                if (observedMarkers.length !== 1) {
+                  throw new Error("Observed dashboard state marker is invalid");
+                }
+                let observedState;
+                try {
+                  observedState = JSON.parse(observedMarkers[0][1]);
+                } catch (error) {
+                  throw new Error(
+                    `Observed dashboard state JSON is invalid: ${error.message}`
+                  );
+                }
+                validateState(observedState);
+              }
               const labels = issue.labels.map(label =>
                 typeof label === "string" ? label : label.name
               );
@@ -632,6 +657,9 @@ safe-outputs:
                     continue;
                   }
                   if (!stateFindings.has(match[1])) {
+                    continue;
+                  }
+                  if (!qualifiesForInvestigation(stateFindings.get(match[1]))) {
                     continue;
                   }
                   if (

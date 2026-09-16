@@ -436,13 +436,9 @@ safe-outputs:
                     "m"
                   )
                 ) ||
-                (
-                  activeFinding &&
-                  (
-                    activeFinding.title !== rowTitle ||
-                    activeFinding.severity !== rowSeverity
-                  )
-                )
+                !activeFinding ||
+                activeFinding.title !== rowTitle ||
+                activeFinding.severity !== rowSeverity
               ) {
                 throw new Error(
                   "Investigation report title or severity does not match the pending row"
